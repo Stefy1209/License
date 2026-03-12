@@ -1,0 +1,1 @@
+# Licență - Aplicabilitatea modelelor AI de estimare a adâncimii monocular în detecția și evitarea obstacolelor 
