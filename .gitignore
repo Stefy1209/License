@@ -541,3 +541,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Camera matrix used for calibration of the camera
+calibration.npz
