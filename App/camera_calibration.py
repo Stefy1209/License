@@ -14,10 +14,8 @@ def run_calibration(camera_id: int, out_path: str, cols: int, rows: int, square_
 
     # prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
     object_points = np.zeros((cols*rows,3), np.float32)
-    object_points[:, :2] = np.array(
-        [(c * square_mm, r * square_mm) for r in range(rows) for c in range(cols)],
-        dtype=np.float32,
-    )
+    object_points[:,:2] = np.mgrid[0:cols, 0:rows].T.reshape(-1, 2)
+    object_points *= square_mm
 
     # Arrays to store object points and image points from all the images.
     real_world_points = [] # 3d point in real world space
@@ -27,22 +25,25 @@ def run_calibration(camera_id: int, out_path: str, cols: int, rows: int, square_
     if not camera.isOpened():
         sys.exit(f"ERROR: Cannot open camera {camera_id}")
 
-    print(f"\n=== CAMERA CALIBRATION ===")
-    print(f"Pattern      : {cols}x{rows} inner corners")
-    print(f"Output       : {out_path}")
-    print(f"Frames needed: at least {min_frames}\n")
-    print("Controls:")
-    print("  c      — compute & save calibration")
-    print("  q      — quit without saving\n")
-
-    COOLDOWN_SEC = 2.0          
-    last_capture = -COOLDOWN_SEC
+    cooldown_sec = 1.0          
+    last_capture = -cooldown_sec
+    number_of_captured_frames = 0
 
     while True:
+        if number_of_captured_frames >= min_frames:
+            rms, camera_matrix, distortion_coefficients, rotation_vectors, translation_vectors = cv.calibrateCamera(real_world_points, image_points, gray.shape[::-1], None, None) 
+
+            print(f"RMS Values: {rms}.")
+
+            if rms > 1.0:
+                print("Consider recalibrating.")
+
+            np.savez(out_path, camera_matrix = camera_matrix, distortion_coefficients = distortion_coefficients, rms = np.float32(rms))
+            break
+
         camera_found, frame = camera.read()
         if not camera_found:
-            print("ERROR: Lost camera feed.")
-            break
+            sys.exit("ERROR: Lost camera feed.")
 
         now = cv.getTickCount() / cv.getTickFrequency()
         gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
@@ -53,51 +54,18 @@ def run_calibration(camera_id: int, out_path: str, cols: int, rows: int, square_
             corners_sub = cv.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
             cv.drawChessboardCorners(display, pattern, corners_sub, corners_found)
             
-            cooldown_left = COOLDOWN_SEC - (now - last_capture)
+            cooldown_left = cooldown_sec - (now - last_capture)
             if cooldown_left <= 0:
                 real_world_points.append(object_points.copy())
                 image_points.append(corners_sub)
                 last_capture = now
-                print(f"  Captured frame {len(real_world_points)}")
-                status = f"CAPTURED  |  Total: {len(real_world_points)}"
-                color  = (0, 255, 120)
-            else:
-                status = f"FOUND  |  Captured: {len(real_world_points)}  |  Next in {cooldown_left:.1f}s"
-                color  = (0, 220, 0)
-        else:
-            corners_sub = None
-            status = f"Searching...  |  Captured: {len(real_world_points)}"
-            color  = (0, 100, 255)
+                number_of_captured_frames += 1
 
-        cv.putText(display, status, (10, 30), cv.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
-        cv.putText(display, "SPACE=capture   c=calibrate   q=quit", (10, display.shape[0] - 12), cv.FONT_HERSHEY_SIMPLEX, 0.55, (200, 200, 200), 1)
         cv.imshow("Camera Calibration", display)
 
         key = cv.waitKey(1) & 0xFF
  
         if key == ord('q'):
-            print("Quit — calibration not saved.")
-            break
- 
-        elif key == ord('c'):
-            n = len(real_world_points)
-            if n < min_frames:
-                print(f"  Need at least {min_frames} frames, have {n}. Keep capturing.")
-                continue
- 
-            print(f"\nComputing calibration from {n} frames ...")
-            rms, K, dist, _, _ = cv.calibrateCamera(real_world_points, image_points, gray.shape[::-1], None, None)
-            fx, fy = K[0, 0], K[1, 1]
-            cx, cy = K[0, 2], K[1, 2]
- 
-            print(f"  RMS reprojection error : {rms:.4f} px")
-            print(f"  fx={fx:.2f}  fy={fy:.2f}  cx={cx:.2f}  cy={cy:.2f}")
-            if rms > 1.0:
-                print("  WARNING: RMS > 1.0 px — consider re-calibrating.")
-                print("           Tips: more frames, vary angles, fill the frame.")
- 
-            np.savez(out_path, K=K, dist=dist, rms=np.float32(rms))
-            print(f"  Saved to '{out_path}'")
             break
 
     camera.release()
