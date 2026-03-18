@@ -1,0 +1,17 @@
+[camera]
+# Index of the camera device (0 = default webcam)
+id          = 0
+# Capture resolution
+width       = 640
+height      = 480
+
+[calibration]
+# Path where calibrate_camera.py saves (and da3_depth.py reads) intrinsics
+file        = "calibration.npz"
+# Checkerboard inner corners  (columns × rows)
+cols        = 9
+rows        = 6
+# Physical size of one checkerboard square in millimeters
+square_mm   = 25.0
+# Minimum captured frames required before computing calibration
+min_frames  = 15
