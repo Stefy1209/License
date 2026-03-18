@@ -12,6 +12,6 @@ file        = "calibration.npz"
 cols        = 9
 rows        = 6
 # Physical size of one checkerboard square in millimeters
-square_mm   = 25.0
+square_mm   = 18
 # Minimum captured frames required before computing calibration
 min_frames  = 15
