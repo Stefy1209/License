@@ -6,13 +6,10 @@ import argparse
 from config_loader import load_config
 
 def run_calibration(camera_id: int, out_path: str, cols: int, rows: int, square_mm: float, min_frames: int) -> None:
-    # pattern
     pattern = (cols, rows)
 
-    # termination criteria
     criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
-    # prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
     object_points = np.zeros((cols*rows,3), np.float32)
     object_points[:,:2] = np.mgrid[0:cols, 0:rows].T.reshape(-1, 2)
     object_points *= square_mm
@@ -71,10 +68,6 @@ def run_calibration(camera_id: int, out_path: str, cols: int, rows: int, square_
     camera.release()
     cv.destroyAllWindows()
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Entry point
-# ──────────────────────────────────────────────────────────────────────────────
- 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="OpenCV checkerboard camera calibration", formatter_class=argparse.ArgumentDefaultsHelpFormatter,)
     parser.add_argument("--config", type=str,   default="config.toml", help="Path to TOML configuration file")
@@ -87,7 +80,6 @@ if __name__ == "__main__":
  
     cfg = load_config(args.config)
  
-    # CLI wins over config file when explicitly provided
     run_calibration(
         camera_id  = args.camera    if args.camera is not None else cfg["camera"]["id"],
         out_path   = args.out       if args.out    is not None else cfg["calibration"]["file"],
