@@ -544,3 +544,4 @@ __marimo__/
 
 # Camera matrix used for calibration of the camera
 calibration.npz
+App/.vscode/settings.json
