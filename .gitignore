@@ -542,7 +542,11 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+# VSCode settings
+.vscode/settings.json
+
 # Camera matrix used for calibration of the camera
 calibration.npz
-App/.vscode/settings.json
+
+# Depth map used to test the path finding algorithm
 App/depth_map.npy
