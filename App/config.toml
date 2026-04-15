@@ -23,6 +23,7 @@ ransac_threshold   = 0.08   # inlier tolerance in metres
 ransac_iterations  = 200
 plane_smoothing    = 0.85   # EMA factor for temporal smoothing
 normal_threshold   = 0.91   # min |cos(angle)| to accept plane as ground (cos 25° ≈ 0.91)
+ground_map_save_location = "ground_mask.npy"
 
 [visualization]
 window_title        = "DA3 Calibrated Live Feed"
