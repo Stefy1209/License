@@ -550,3 +550,6 @@ calibration.npz
 
 # Depth map used to test the path finding algorithm
 App/depth_map.npy
+
+# Ground mask used to save the ground plane
+App/ground_mask.py
