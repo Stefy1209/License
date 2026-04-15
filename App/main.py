@@ -10,9 +10,7 @@ from calibration     import load_calibration
 from camera          import open_camera, build_undistort_maps, build_fallback_intrinsics, undistort
 from model           import load_model, estimate_depth
 from ground          import detect_ground_mask
-from visualization   import (
-    visualize_depth, make_colorbar, overlay_ground, add_status_bar, save_depth_map,
-)
+from visualization   import visualize_depth, make_colorbar, overlay_ground, add_status_bar, save_depth_map, save_ground_mask
 
 
 def run(cfg: dict) -> None:
@@ -92,14 +90,14 @@ def run(cfg: dict) -> None:
                     ground_mask = np.zeros((h, w), dtype=bool)
 
                 depth_color, min_d, max_d = visualize_depth(depth_map)
-                colorbar = make_colorbar(h, vis_cfg["colorbar_width"], min_d, max_d)
+                # colorbar = make_colorbar(h, vis_cfg["colorbar_width"], min_d, max_d)
 
                 frame_view = overlay_ground(frame, ground_mask, ground_colour, vis_cfg["ground_overlay_alpha"])
                 add_status_bar(frame_view, prev_plane)
 
                 depth_view = overlay_ground(depth_color, ground_mask, ground_colour, vis_cfg["ground_overlay_alpha"])
 
-                cv2.imshow(vis_cfg["window_title"], np.hstack((frame_view, depth_view, colorbar)))
+                cv2.imshow(vis_cfg["window_title"], np.hstack((frame_view, depth_view))) # colorbar can be put as parameter
 
             except RuntimeError as e:
                 sys.stdout = sys.__stdout__
@@ -111,6 +109,7 @@ def run(cfg: dict) -> None:
                 break
             if key == ord("s"):
                 save_depth_map(depth_map, dep_cfg["depth_map_save_location"])
+                save_ground_mask(ground_mask, gnd_cfg["ground_map_save_location"])
 
     except KeyboardInterrupt:
         print("Interrupted.")
