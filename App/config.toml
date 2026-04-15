@@ -18,8 +18,8 @@ id             = "depth-anything/da3metric-large"
 depth_map_save_location = "depth_map.npy"
 
 [ground]
-seed_region        = 0.40   # fraction of image height (from bottom) used to seed RANSAC
-ransac_threshold   = 0.08   # inlier tolerance in metres
+seed_region        = 0.25   # fraction of image height (from bottom) used to seed RANSAC
+ransac_threshold   = 0.05   # inlier tolerance in metres
 ransac_iterations  = 200
 plane_smoothing    = 0.85   # EMA factor for temporal smoothing
 normal_threshold   = 0.91   # min |cos(angle)| to accept plane as ground (cos 25° ≈ 0.91)
