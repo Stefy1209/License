@@ -60,3 +60,11 @@ def save_depth_map(depth_map: np.ndarray, path: str) -> None:
         print(f"Depth map saved to '{path}'.")
     except Exception as e:
         print(f"Could not save depth map: {e}")
+
+def save_ground_mask(ground_mask: np.ndarray, path: str) -> None:
+    try:
+        np.save(path, ground_mask)
+        print(f"Ground mask saved to '{path}'.")
+    except Exception as e:
+        print(f"Could not save ground mask: {e}")
+
