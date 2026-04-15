@@ -552,4 +552,4 @@ calibration.npz
 App/depth_map.npy
 
 # Ground mask used to save the ground plane
-App/ground_mask.py
+App/ground_mask.npy
