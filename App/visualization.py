@@ -42,6 +42,29 @@ def overlay_ground(
     return blended
 
 
+def overlay_path(image: np.ndarray, path: np.ndarray, start: Tuple[int, int], end: Tuple[int, int]) -> np.ndarray:
+    """Overlay the A* path, start, and end markers onto an image (in-place copy)."""
+    out = image.copy()
+
+    if len(path) >= 2:
+        for i in range(len(path) - 1):
+            pt1 = (int(path[i,     1]), int(path[i,     0]))  # (col, row) → (x, y)
+            pt2 = (int(path[i + 1, 1]), int(path[i + 1, 0]))
+            cv2.line(out, pt1, pt2, color=(0, 255, 255), thickness=2, lineType=cv2.LINE_AA)
+
+    # Start marker — green circle
+    if start is not None:
+        cv2.circle(out, (int(start[1]), int(start[0])), radius=6, color=(0, 255, 0),  thickness=-1)
+        cv2.circle(out, (int(start[1]), int(start[0])), radius=6, color=(0, 0, 0),    thickness=1)
+
+    # End marker — red circle
+    if end is not None:
+        cv2.circle(out, (int(end[1]),   int(end[0])),   radius=6, color=(0, 0, 255),  thickness=-1)
+        cv2.circle(out, (int(end[1]),   int(end[0])),   radius=6, color=(0, 0, 0),    thickness=1)
+
+    return out
+
+
 def add_status_bar(image: np.ndarray, plane: Optional[np.ndarray]) -> None:
     """Draw a HUD strip at the top of *image* (in-place)."""
     if plane is None:

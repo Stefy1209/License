@@ -2,9 +2,7 @@ import numpy as np
 from typing import Optional, Tuple
 
 
-def depth_to_pointcloud(
-    depth_map: np.ndarray, mtx: np.ndarray
-) -> Tuple[np.ndarray, np.ndarray]:
+def depth_to_pointcloud(depth_map: np.ndarray, mtx: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """Back-project every pixel to 3-D (camera space).
 
     Returns
@@ -25,9 +23,7 @@ def depth_to_pointcloud(
     return points, pixels
 
 
-def ransac_plane(
-    points: np.ndarray, n_iter: int, threshold: float
-) -> Optional[np.ndarray]:
+def ransac_plane(points: np.ndarray, n_iter: int, threshold: float) -> Optional[np.ndarray]:
     """Fit aX+bY+cZ+d=0 to *points* via RANSAC; returns (4,) or None."""
     N = len(points)
     if N < 3:

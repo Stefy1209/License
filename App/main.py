@@ -10,8 +10,8 @@ from calibration     import load_calibration
 from camera          import open_camera, build_undistort_maps, build_fallback_intrinsics, undistort
 from model           import load_model, estimate_depth
 from ground          import detect_ground_mask
-from visualization   import visualize_depth, make_colorbar, overlay_ground, add_status_bar, save_depth_map, save_ground_mask
-
+from path            import find_starting_point, find_ending_point, find_path
+from visualization   import visualize_depth, overlay_ground, overlay_path, add_status_bar, save_depth_map, save_ground_mask
 
 def run(cfg: dict) -> None:
     cam_cfg   = cfg["camera"]
@@ -43,6 +43,11 @@ def run(cfg: dict) -> None:
     consecutive_failures = 0
     prev_plane   = None
     fallback_mtx = None
+
+    # Path state — reused across frames
+    path         = np.empty((0, 2), dtype=int)
+    start_point  = None
+    end_point    = None
 
     try:
         while True:
@@ -86,18 +91,36 @@ def run(cfg: dict) -> None:
                         normal_threshold  = gnd_cfg["normal_threshold"],
                         prev_plane        = prev_plane,
                     )
+
+                    # --- Path planning ---
+                    try:
+                        start_point = find_starting_point(ground_mask)
+                        end_point   = find_ending_point(ground_mask)
+                        path        = find_path(ground_mask, start_point, end_point)
+                    except ValueError:
+                        # No ground pixels visible — clear stale path
+                        path        = np.empty((0, 2), dtype=int)
+                        start_point = None
+                        end_point   = None
+
                 else:
                     ground_mask = np.zeros((h, w), dtype=bool)
+                    path        = np.empty((0, 2), dtype=int)
+                    start_point = None
+                    end_point   = None
 
-                depth_color, min_d, max_d = visualize_depth(depth_map)
-                # colorbar = make_colorbar(h, vis_cfg["colorbar_width"], min_d, max_d)
+                depth_color, _, _ = visualize_depth(depth_map)
 
-                frame_view = overlay_ground(frame, ground_mask, ground_colour, vis_cfg["ground_overlay_alpha"])
-                add_status_bar(frame_view, prev_plane)
-
+                frame_view = overlay_ground(frame,       ground_mask, ground_colour, vis_cfg["ground_overlay_alpha"])
                 depth_view = overlay_ground(depth_color, ground_mask, ground_colour, vis_cfg["ground_overlay_alpha"])
 
-                cv2.imshow(vis_cfg["window_title"], np.hstack((frame_view, depth_view))) # colorbar can be put as parameter
+                # Draw path on both views
+                frame_view = overlay_path(frame_view, path, start_point, end_point)
+                depth_view = overlay_path(depth_view, path, start_point, end_point)
+
+                add_status_bar(frame_view, prev_plane)
+
+                cv2.imshow(vis_cfg["window_title"], np.hstack((frame_view, depth_view)))
 
             except RuntimeError as e:
                 sys.stdout = sys.__stdout__
