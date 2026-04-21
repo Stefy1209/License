@@ -60,26 +60,59 @@ def ransac_plane(points: np.ndarray, n_iter: int, threshold: float) -> Optional[
     return best_plane
 
 
+def _resolve_threshold(depth_map: np.ndarray, depth_mode: str,
+                        threshold_metric: float, threshold_relative: float) -> float:
+    """
+    Return the RANSAC inlier threshold appropriate for the active depth mode.
+
+    metric   : return threshold_metric unchanged (absolute, in metres).
+    relative : return threshold_relative * depth_range, so the tolerance scales with the actual spread of depth values in the frame.
+    """
+    if depth_mode == "metric":
+        return threshold_metric
+    # relative mode: scale by the depth range of the current frame
+    d_min, d_max = float(depth_map.min()), float(depth_map.max())
+    depth_range = d_max - d_min
+    if depth_range < 1e-6:
+        return threshold_relative        # degenerate frame — use raw value
+    return threshold_relative * depth_range
+
+
 def detect_ground_mask(
     depth_map: np.ndarray,
     mtx: np.ndarray,
     seed_region: float,
-    ransac_threshold: float,
+    ransac_threshold_metric: float,
+    ransac_threshold_relative: float,
     ransac_iterations: int,
     plane_smoothing: float,
     normal_threshold: float,
     prev_plane: Optional[np.ndarray],
+    depth_mode: str = "metric",
 ) -> Tuple[np.ndarray, Optional[np.ndarray]]:
-    """Return (binary ground mask, updated plane coefficients)."""
+    """Return (binary ground mask, updated plane coefficients).
+
+    Parameters
+    ----------
+    ransac_threshold_metric   : inlier tolerance in metres (metric mode).
+    ransac_threshold_relative : inlier tolerance as a fraction of the depth range (relative mode).
+    depth_mode                : "metric" | "relative" — selects which threshold to use and how to interpret depth.
+    """
     h = depth_map.shape[0]
+
+    threshold = _resolve_threshold(
+        depth_map, depth_mode,
+        ransac_threshold_metric, ransac_threshold_relative,
+    )
+
     all_points, all_pixels = depth_to_pointcloud(depth_map, mtx)
 
     # Seed RANSAC from the bottom portion of the image
-    seed_row = int(h * (1.0 - seed_region))
+    seed_row  = int(h * (1.0 - seed_region))
     seed_mask = all_pixels[:, 0] >= seed_row
     seed_pts  = all_points[seed_mask]
 
-    raw_plane = ransac_plane(seed_pts, ransac_iterations, ransac_threshold)
+    raw_plane = ransac_plane(seed_pts, ransac_iterations, threshold)
 
     # Reject planes not roughly horizontal (normal ≈ Y axis)
     if raw_plane is not None and abs(raw_plane[1]) < normal_threshold:
@@ -95,7 +128,7 @@ def detect_ground_mask(
     ground_mask = np.zeros(depth_map.shape, dtype=bool)
     if smoothed_plane is not None:
         dist = np.abs(all_points @ smoothed_plane[:3] + smoothed_plane[3])
-        inlier_pixels = all_pixels[dist < ransac_threshold]
+        inlier_pixels = all_pixels[dist < threshold]
         ground_mask[inlier_pixels[:, 0], inlier_pixels[:, 1]] = True
 
     return ground_mask, smoothed_plane

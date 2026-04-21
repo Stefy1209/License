@@ -10,15 +10,22 @@ def visualize_depth(depth_map: np.ndarray) -> Tuple[np.ndarray, float, float]:
     return cv2.applyColorMap(norm, cv2.COLORMAP_INFERNO), min_d, max_d
 
 
-def make_colorbar(height: int, width: int, min_depth: float, max_depth: float) -> np.ndarray:
-    """Vertical INFERNO colorbar with depth tick labels."""
+def make_colorbar(height: int, width: int, min_depth: float, max_depth: float,
+                  depth_mode: str = "metric") -> np.ndarray:
+    """Vertical INFERNO colorbar with depth tick labels.
+
+    Labels show metres when depth_mode="metric", or a unitless 0-1 scale
+    when depth_mode="relative".
+    """
     gradient = np.tile(np.linspace(255, 0, height, dtype=np.uint8).reshape(height, 1), (1, width))
     bar = cv2.applyColorMap(gradient, cv2.COLORMAP_INFERNO)
 
+    unit = "m" if depth_mode == "metric" else ""
     for i in range(6):
         frac  = i / 5
         y     = max(int(frac * (height - 1)), 10)
-        label = f"{max_depth - frac * (max_depth - min_depth):.2f}m"
+        value = max_depth - frac * (max_depth - min_depth)
+        label = f"{value:.2f}{unit}"
         cv2.putText(bar, label, (4, y), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 2, cv2.LINE_AA)
         cv2.putText(bar, label, (4, y), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
 

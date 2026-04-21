@@ -9,11 +9,13 @@
 #    "nvidia"  — x86 / ARM host with a CUDA-capable NVIDIA GPU.
 #                Uses PyTorch + CUDA via DepthAnything3 (HuggingFace).
 #
-#    "rpi"     — Raspberry Pi 5 + AI HAT+ (Hailo-8L, 26 TOPS NPU).
+#    "rpi"     — Raspberry Pi 5 + AI HAT+ (Hailo-8, 26 TOPS NPU).
 #                Uses hailort for inference and picamera2 for capture.
 # -----------------------------------------------------------------------------
 [hardware]
-profile = "nvidia"          # "nvidia" | "rpi"
+profile    = "nvidia"       # "nvidia" | "rpi"
+depth_mode = "metric"       # "metric" (absolute, metres) | "relative" (unitless, inverted) 
+                            # nvidia supports both; rpi (DA2 ViT-S) only supports "relative"
 
 # -----------------------------------------------------------------------------
 #  Camera
@@ -50,12 +52,17 @@ id = "depth-anything/da3metric-large"
 # -----------------------------------------------------------------------------
 [rpi]
 # Path to the compiled Hailo HEF file.
-# Obtain a pre-compiled HEF from Hailo's Model Zoo or compile one yourself with the Hailo Dataflow Compiler targeting the Hailo-8L (hailo8l).
-hef_path          = "models/depth_anything_v2.hef"
+# Depth Anything V2 ViT-S is available in the Hailo Model Zoo (Zero-Shot
+# Depth Estimation). Compile targeting hailo8 (26 TOPS) or hailo8l (13 TOPS).
+hef_path          = "models/depth_anything_v2_vits.hef"
 
 # Input resolution the HEF was compiled for (must match exactly).
 model_input_width  = 518
 model_input_height = 518
+
+# NOTE: set [hardware] depth_mode = "relative" when using this backend.
+# DA2 ViT-S outputs inverse relative depth (closer = higher value); the
+# model_rpi backend will invert it automatically when depth_mode = "relative".
 
 # -----------------------------------------------------------------------------
 #  Depth map saving
@@ -68,12 +75,18 @@ depth_map_save_location = "depth_map.npy"
 # -----------------------------------------------------------------------------
 [ground]
 seed_region        = 0.25   # fraction of image height (from bottom) seeding RANSAC
-ransac_threshold   = 0.05   # inlier tolerance in metres
 ransac_iterations  = 200
 plane_smoothing    = 0.85   # EMA weight for temporal smoothing (higher = more stable)
 normal_threshold   = 0.91   # min |cos(angle)| to accept plane as roughly horizontal
-                            # cos(25°) ≈ 0.91  →  planes tilted >25° are rejected
+                            # cos(25 deg) approx 0.91 -> planes tilted >25 deg are rejected
 ground_map_save_location = "ground_mask.npy"
+
+# Inlier tolerance for RANSAC plane fitting.
+# metric   mode: absolute distance in metres (e.g. 0.05 = 5 cm).
+# relative mode: fraction of the depth range (e.g. 0.03 = 3% of range).
+#   The active value is selected automatically based on [hardware] depth_mode.
+ransac_threshold_metric   = 0.05
+ransac_threshold_relative = 0.03
 
 # -----------------------------------------------------------------------------
 #  Visualisation

@@ -6,7 +6,8 @@ Hardware profiles
 Set  [hardware] profile = "nvidia"  or  "rpi"  in config.toml.
 
   nvidia : NVIDIA GPU host — PyTorch + CUDA inference via DepthAnything3.
-  rpi    : Raspberry Pi 5 + AI HAT+ (Hailo-8L NPU) — hailort inference, picamera2 camera capture.
+  rpi    : Raspberry Pi 5 + AI HAT+ (Hailo-8L NPU) — hailort inference,
+           picamera2 camera capture.
 
 Calibration
 -----------
@@ -181,12 +182,14 @@ def run(cfg: dict) -> None:
                 if effective_mtx is not None:
                     ground_mask, prev_plane = detect_ground_mask(
                         depth_map, effective_mtx,
-                        seed_region       = gnd_cfg["seed_region"],
-                        ransac_threshold  = gnd_cfg["ransac_threshold"],
-                        ransac_iterations = gnd_cfg["ransac_iterations"],
-                        plane_smoothing   = gnd_cfg["plane_smoothing"],
-                        normal_threshold  = gnd_cfg["normal_threshold"],
-                        prev_plane        = prev_plane,
+                        seed_region               = gnd_cfg["seed_region"],
+                        ransac_threshold_metric   = gnd_cfg["ransac_threshold_metric"],
+                        ransac_threshold_relative = gnd_cfg["ransac_threshold_relative"],
+                        ransac_iterations         = gnd_cfg["ransac_iterations"],
+                        plane_smoothing           = gnd_cfg["plane_smoothing"],
+                        normal_threshold          = gnd_cfg["normal_threshold"],
+                        prev_plane                = prev_plane,
+                        depth_mode                = hw.depth_mode,
                     )
 
                     # Path planning
@@ -245,6 +248,7 @@ if __name__ == "__main__":
         description="Depth-based ground detection and path planning.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("--config", default="config.toml", help="Path to TOML configuration file.")
+    parser.add_argument("--config", default="config.toml",
+                        help="Path to TOML configuration file.")
     args = parser.parse_args()
     run(load_config(args.config))
