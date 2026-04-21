@@ -33,7 +33,7 @@ from model          import load_model, estimate_depth
 from ground         import detect_ground_mask
 from path           import find_starting_point, find_ending_point, find_path
 from visualization  import (
-    visualize_depth, overlay_ground, overlay_path,
+    overlay_ground, overlay_path,
     add_status_bar, save_depth_map, save_ground_mask,
 )
 
@@ -208,17 +208,13 @@ def run(cfg: dict) -> None:
                     start_point = None
                     end_point   = None
 
-                depth_color, _, _ = visualize_depth(depth_map)
-
-                frame_view = overlay_ground(frame,       ground_mask, ground_colour, vis_cfg["ground_overlay_alpha"])
-                depth_view = overlay_ground(depth_color, ground_mask, ground_colour, vis_cfg["ground_overlay_alpha"])
+                frame_view = overlay_ground(frame, ground_mask, ground_colour, vis_cfg["ground_overlay_alpha"])
 
                 frame_view = overlay_path(frame_view, path, start_point, end_point)
-                depth_view = overlay_path(depth_view, path, start_point, end_point)
 
                 add_status_bar(frame_view, prev_plane)
 
-                cv2.imshow(vis_cfg["window_title"], np.hstack((frame_view, depth_view)))
+                cv2.imshow(vis_cfg["window_title"], frame_view)
 
             except RuntimeError as exc:
                 sys.stdout = sys.__stdout__

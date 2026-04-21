@@ -13,8 +13,8 @@
 #                Uses hailort for inference and picamera2 for capture.
 # -----------------------------------------------------------------------------
 [hardware]
-profile    = "nvidia"       # "nvidia" | "rpi"
-depth_mode = "metric"       # "metric" (absolute, metres) | "relative" (unitless, inverted) 
+profile    = "rpi"       # "nvidia" | "rpi"
+depth_mode = "relative"       # "metric" (absolute, metres) | "relative" (unitless, inverted) 
                             # nvidia supports both; rpi (DA2 ViT-S) only supports "relative"
 
 # -----------------------------------------------------------------------------
@@ -22,16 +22,12 @@ depth_mode = "metric"       # "metric" (absolute, metres) | "relative" (unitless
 # -----------------------------------------------------------------------------
 [camera]
 id               = 0        # device index (V4L2 / picamera2 index)
-width            = 640
-height           = 480
+width            = 320
+height           = 240
 max_read_retries = 5
 
 # -----------------------------------------------------------------------------
 #  Calibration  (checkerboard)
-#  If the file is missing at startup you will be prompted to either:
-#    c — run interactive calibration,
-#    s — skip (fallback ~70° FOV intrinsics will be used), or
-#    q — quit.
 # -----------------------------------------------------------------------------
 [calibration]
 file       = "calibration.npz"
@@ -52,13 +48,12 @@ id = "depth-anything/da3metric-large"
 # -----------------------------------------------------------------------------
 [rpi]
 # Path to the compiled Hailo HEF file.
-# Depth Anything V2 ViT-S is available in the Hailo Model Zoo (Zero-Shot
-# Depth Estimation). Compile targeting hailo8 (26 TOPS) or hailo8l (13 TOPS).
+# Depth Anything V2 ViT-S is available in the Hailo Model Zoo (Zero-Shot Depth Estimation). Compile targeting hailo8 (26 TOPS) or hailo8l (13 TOPS).
 hef_path          = "models/depth_anything_v2_vits.hef"
 
 # Input resolution the HEF was compiled for (must match exactly).
-model_input_width  = 518
-model_input_height = 518
+model_input_width  = 224
+model_input_height = 224
 
 # NOTE: set [hardware] depth_mode = "relative" when using this backend.
 # DA2 ViT-S outputs inverse relative depth (closer = higher value); the
@@ -75,7 +70,7 @@ depth_map_save_location = "depth_map.npy"
 # -----------------------------------------------------------------------------
 [ground]
 seed_region        = 0.25   # fraction of image height (from bottom) seeding RANSAC
-ransac_iterations  = 200
+ransac_iterations  = 100
 plane_smoothing    = 0.85   # EMA weight for temporal smoothing (higher = more stable)
 normal_threshold   = 0.91   # min |cos(angle)| to accept plane as roughly horizontal
                             # cos(25 deg) approx 0.91 -> planes tilted >25 deg are rejected

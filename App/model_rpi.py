@@ -6,10 +6,15 @@ Pipeline
 1. Pre-process the RGB frame into the tensor format expected by the HEF.
 2. Run inference via hailort (the official Hailo Python SDK).
 3. Post-process the raw output:
-     - depth_mode = "relative": invert the disparity map so that closer pixels have SMALLER values (consistent with the metric convention used by the rest of the pipeline).
-     - depth_mode = "metric":   use the output as-is (requires a metric-calibrated HEF, e.g. a custom DA3 compile).
+     - depth_mode = "relative": invert the disparity map so that
+       closer pixels have SMALLER values (consistent with the metric
+       convention used by the rest of the pipeline).
+     - depth_mode = "metric":   use the output as-is (requires a
+       metric-calibrated HEF, e.g. a custom DA3 compile).
 
-DA2 ViT-S from the Hailo Model Zoo outputs *inverse* relative depth (disparity): higher value = closer. We invert it to get a depth-like map where higher value = farther, then normalise to [0, 1].
+DA2 ViT-S from the Hailo Model Zoo outputs *inverse* relative depth
+(disparity): higher value = closer. We invert it to get a depth-like
+map where higher value = farther, then normalise to [0, 1].
 
 Requirements (installed on the Pi)
 ------------------------------------
@@ -83,7 +88,7 @@ class HailoDepthModel:
 
         input_params  = InputVStreamParams.make(
             self._network_group, quantized=False,
-            format_type=FormatType.FLOAT32,
+            format_type=FormatType.UINT8,
         )
         output_params = OutputVStreamParams.make(
             self._network_group, quantized=False,
@@ -139,12 +144,9 @@ def estimate_depth(
     ih, iw = model.input_height, model.input_width
 
     # ---- Pre-processing ----
+    # The HEF handles normalisation internally — send raw uint8 RGB.
     resized      = cv2.resize(rgb_frame, (iw, ih), interpolation=cv2.INTER_LINEAR)
-    norm         = resized.astype(np.float32) / 255.0
-    mean         = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-    std          = np.array([0.229, 0.224, 0.225], dtype=np.float32)
-    norm         = (norm - mean) / std
-    input_tensor = norm[np.newaxis, ...]    # (1, H, W, 3) NHWC
+    input_tensor = resized[np.newaxis, ...].astype(np.uint8)   # (1, H, W, 3) NHWC uint8
 
     # ---- Inference ----
     with model._network_group.activate(model._ng_params):
@@ -153,8 +155,7 @@ def estimate_depth(
             model._input_params,
             model._output_params,
         ) as infer_pipeline:
-            infer_pipeline.send({model._input_name: input_tensor})
-            output = infer_pipeline.recv()
+            output = infer_pipeline.infer({model._input_name: input_tensor})
 
     raw   = output[model._output_name]
     depth = raw.squeeze().astype(np.float32)
