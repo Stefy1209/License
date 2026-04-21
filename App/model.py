@@ -1,45 +1,66 @@
-import os
+"""
+model.py — Hardware-aware factory for depth estimation.
+
+Depending on the active HardwareProfile this module imports and delegates to:
+  * model_nvidia.py  — PyTorch + CUDA (NVIDIA GPU)
+  * model_rpi.py     — hailort (Raspberry Pi 5 + AI HAT+)
+
+Usage (from main.py)
+--------------------
+    from model import load_model, estimate_depth
+
+Both functions share the same external signature regardless of backend.
+"""
+
+from __future__ import annotations
+
 import numpy as np
-import torch
-from typing import Optional
-from depth_anything_3.api import DepthAnything3
+from typing import Optional, Any
 
-# Help PyTorch find CUDA libraries in Conda environments
-if "CONDA_PREFIX" in os.environ:
-    conda_lib = os.path.join(os.environ["CONDA_PREFIX"], "lib")
-    os.environ["LD_LIBRARY_PATH"] = conda_lib + ":" + os.environ.get("LD_LIBRARY_PATH", "")
+from hardware import HardwareProfile
 
 
-def load_model(model_id: str, device: str) -> torch.nn.Module:
-    """Load DepthAnything3 and optionally compile it."""
-    torch._C._jit_set_profiling_executor(False)
-    torch._C._jit_set_profiling_mode(False)
+def load_model(model_id: str, device: str, hw: HardwareProfile, cfg: dict) -> Any:
+    """
+    Load the depth model appropriate for *hw*.
 
-    model = DepthAnything3.from_pretrained(model_id).to(device)
-    model.eval()
+    Parameters
+    ----------
+    model_id : HuggingFace model ID (used by the NVIDIA backend).
+    device   : Torch device string (from hw.torch_device()).
+    hw       : Active HardwareProfile.
+    cfg      : Full config dict (RPi backend reads the [rpi] section).
+    """
+    if hw.is_nvidia:
+        from model_nvidia import load_model as _load
+        return _load(model_id, device)
 
-    if hasattr(torch, "compile"):
-        try:
-            model = torch.compile(model)
-            print("Model compiled with torch.compile.")
-        except Exception as e:
-            print(f"torch.compile skipped: {e}")
+    if hw.is_rpi:
+        from model_rpi import load_model as _load
+        rpi_cfg = cfg.get("rpi", {})
+        return _load(model_id, device, rpi_cfg)
 
-    return model
+    raise RuntimeError(f"No model backend for profile '{hw.profile}'.")
 
 
-@torch.inference_mode()
 def estimate_depth(
     rgb_frame: np.ndarray,
-    model: torch.nn.Module,
+    model: Any,
     intrinsics: Optional[np.ndarray],
     device: str,
+    hw: HardwareProfile,
 ) -> np.ndarray:
-    """Run inference; returns a float32 depth map at model resolution."""
-    ctx = torch.amp.autocast("cuda") if device == "cuda" else torch.no_grad()
-    with ctx:
-        prediction = model.inference(
-            image=[rgb_frame],
-            intrinsics=[intrinsics] if intrinsics is not None else None,
-        )
-    return prediction.depth[0]
+    """
+    Run depth inference on *rgb_frame* using the backend selected by *hw*.
+
+    Returns float32 depth map at model resolution.
+    """
+    if hw.is_nvidia:
+        from model_nvidia import estimate_depth as _infer
+        return _infer(rgb_frame, model, intrinsics, device)
+
+    if hw.is_rpi:
+        from model_rpi import estimate_depth as _infer
+        return _infer(rgb_frame, model, intrinsics, device)
+
+    raise RuntimeError(f"No inference backend for profile '{hw.profile}'.")

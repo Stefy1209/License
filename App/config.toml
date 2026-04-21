@@ -1,32 +1,85 @@
+# =============================================================================
+#  config.toml — Depth-based ground detection & path planning
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+#  Hardware profile
+#  Choose the backend that matches your machine:
+#
+#    "nvidia"  — x86 / ARM host with a CUDA-capable NVIDIA GPU.
+#                Uses PyTorch + CUDA via DepthAnything3 (HuggingFace).
+#
+#    "rpi"     — Raspberry Pi 5 + AI HAT+ (Hailo-8L, 26 TOPS NPU).
+#                Uses hailort for inference and picamera2 for capture.
+# -----------------------------------------------------------------------------
+[hardware]
+profile = "nvidia"          # "nvidia" | "rpi"
+
+# -----------------------------------------------------------------------------
+#  Camera
+# -----------------------------------------------------------------------------
 [camera]
-id             = 0
-width          = 640
-height         = 480
+id               = 0        # device index (V4L2 / picamera2 index)
+width            = 640
+height           = 480
 max_read_retries = 5
 
+# -----------------------------------------------------------------------------
+#  Calibration  (checkerboard)
+#  If the file is missing at startup you will be prompted to either:
+#    c — run interactive calibration,
+#    s — skip (fallback ~70° FOV intrinsics will be used), or
+#    q — quit.
+# -----------------------------------------------------------------------------
 [calibration]
-file           = "calibration.npz"
-cols           = 9
-rows           = 6
-square_mm      = 18
-min_frames     = 20
+file       = "calibration.npz"
+cols       = 9              # inner corners along the long edge
+rows       = 6              # inner corners along the short edge
+square_mm  = 18             # physical square size in millimetres
+min_frames = 20             # captured poses before solving
 
+# -----------------------------------------------------------------------------
+#  Depth model  (NVIDIA backend)
+# -----------------------------------------------------------------------------
 [model]
-id             = "depth-anything/da3metric-large"
+id = "depth-anything/da3metric-large"
 
+# -----------------------------------------------------------------------------
+#  RPi / Hailo backend settings
+#  Only used when [hardware] profile = "rpi".
+# -----------------------------------------------------------------------------
+[rpi]
+# Path to the compiled Hailo HEF file.
+# Obtain a pre-compiled HEF from Hailo's Model Zoo or compile one yourself with the Hailo Dataflow Compiler targeting the Hailo-8L (hailo8l).
+hef_path          = "models/depth_anything_v2.hef"
+
+# Input resolution the HEF was compiled for (must match exactly).
+model_input_width  = 518
+model_input_height = 518
+
+# -----------------------------------------------------------------------------
+#  Depth map saving
+# -----------------------------------------------------------------------------
 [depth]
 depth_map_save_location = "depth_map.npy"
 
+# -----------------------------------------------------------------------------
+#  Ground detection  (RANSAC plane fitting)
+# -----------------------------------------------------------------------------
 [ground]
-seed_region        = 0.25   # fraction of image height (from bottom) used to seed RANSAC
+seed_region        = 0.25   # fraction of image height (from bottom) seeding RANSAC
 ransac_threshold   = 0.05   # inlier tolerance in metres
 ransac_iterations  = 200
-plane_smoothing    = 0.85   # EMA factor for temporal smoothing
-normal_threshold   = 0.91   # min |cos(angle)| to accept plane as ground (cos 25° ≈ 0.91)
+plane_smoothing    = 0.85   # EMA weight for temporal smoothing (higher = more stable)
+normal_threshold   = 0.91   # min |cos(angle)| to accept plane as roughly horizontal
+                            # cos(25°) ≈ 0.91  →  planes tilted >25° are rejected
 ground_map_save_location = "ground_mask.npy"
 
+# -----------------------------------------------------------------------------
+#  Visualisation
+# -----------------------------------------------------------------------------
 [visualization]
-window_title        = "DA3 Calibrated Live Feed"
+window_title         = "DA3 Calibrated Live Feed"
 ground_overlay_alpha = 0.45
-ground_colour_bgr    = [0, 220, 80]  # BGR
+ground_colour_bgr    = [0, 220, 80]   # BGR — bright green
 colorbar_width       = 70
