@@ -6,7 +6,7 @@ Hardware profiles
 Set  [hardware] profile = "nvidia"  or  "rpi"  in config.toml.
 
   nvidia : NVIDIA GPU host — PyTorch + CUDA inference via DepthAnything3.
-  rpi    : Raspberry Pi 5 + AI HAT+ (Hailo-8L NPU) — hailort inference,
+  rpi    : Raspberry Pi 5 + AI HAT+ (Hailo-8 NPU) — hailort inference,
            picamera2 camera capture.
 
 Calibration
@@ -15,6 +15,13 @@ If the calibration file is missing at startup, the user is prompted:
   * Run calibration now   -> runs run_calibration() then continues.
   * Skip (use fallback)   -> continues with an estimated camera matrix.
   * Quit                  -> exits cleanly.
+
+Threading
+---------
+Camera capture runs in a dedicated background thread so the sensor is
+always reading at full speed.  The main thread pulls the most recent
+frame and runs inference + ground detection + path planning + display.
+This eliminates the stutter caused by the camera blocking on inference.
 """
 
 from __future__ import annotations
@@ -22,6 +29,8 @@ from __future__ import annotations
 import os
 import sys
 import argparse
+import threading
+import queue
 import numpy as np
 import cv2
 
@@ -44,7 +53,7 @@ from visualization  import (
 
 def _prompt_calibration(cal_cfg: dict, cam_cfg: dict) -> None:
     """
-    If the calibration file is absent, ask the user what to do.
+    If the calibration file is absent, ask the user what to do. 
 
     Options
     -------
@@ -54,7 +63,7 @@ def _prompt_calibration(cal_cfg: dict, cam_cfg: dict) -> None:
     """
     cal_file = cal_cfg["file"]
     if os.path.exists(cal_file):
-        return  # Nothing to do — file is present.
+        return
 
     print(
         f"\nCalibration file '{cal_file}' not found.\n"
@@ -86,6 +95,48 @@ def _prompt_calibration(cal_cfg: dict, cam_cfg: dict) -> None:
                 print("Calibration was not saved (window closed early). Using fallback.\n")
             return
         print("Please enter 'c', 's', or 'q'.")
+
+
+# ---------------------------------------------------------------------------
+# Capture thread
+# ---------------------------------------------------------------------------
+
+def _capture_worker(
+    cap,
+    frame_queue: queue.Queue,
+    stop_event: threading.Event,
+    max_retries: int,
+) -> None:
+    """
+    Continuously read frames from *cap* and put the latest one into
+    *frame_queue*.
+
+    The queue holds at most 1 item — if the main thread is busy the old
+    frame is discarded so the display always shows the most recent image
+    rather than falling further behind.
+
+    Stops when *stop_event* is set or too many consecutive failures occur.
+    """
+    consecutive_failures = 0
+
+    while not stop_event.is_set():
+        ret, frame = cap.read()
+        if not ret:
+            consecutive_failures += 1
+            if consecutive_failures >= max_retries:
+                print("Capture thread: too many camera failures. Stopping.")
+                stop_event.set()
+            continue
+        consecutive_failures = 0
+
+        # Discard stale frame if main thread hasn't consumed it yet
+        if not frame_queue.empty():
+            try:
+                frame_queue.get_nowait()
+            except queue.Empty:
+                pass
+
+        frame_queue.put(frame)
 
 
 # ---------------------------------------------------------------------------
@@ -137,25 +188,41 @@ def run(cfg: dict) -> None:
         height = cam_cfg.get("height", 480),
     )
 
+    # ------------------------------------------------------------------ #
+    #  Start capture thread                                                #
+    # ------------------------------------------------------------------ #
+    frame_queue = queue.Queue(maxsize=1)
+    stop_event  = threading.Event()
+
+    capture_thread = threading.Thread(
+        target=_capture_worker,
+        args=(cap, frame_queue, stop_event, cam_cfg["max_read_retries"]),
+        daemon=True,
+        name="capture",
+    )
+    capture_thread.start()
     print("Press 'q' to quit, 's' to save the current depth map and ground mask.")
 
-    consecutive_failures = 0
-    prev_plane           = None
-    fallback_mtx         = None
-    path                 = np.empty((0, 2), dtype=int)
-    start_point          = None
-    end_point            = None
+    prev_plane  = None
+    fallback_mtx = None
+    path        = np.empty((0, 2), dtype=int)
+    start_point = None
+    end_point   = None
+    depth_map   = None
+    ground_mask = None
 
     try:
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                consecutive_failures += 1
-                if consecutive_failures >= cam_cfg["max_read_retries"]:
-                    print("Too many camera failures. Exiting.")
+        while not stop_event.is_set():
+
+            # ---- Grab the latest frame (block up to 500 ms) ----
+            try:
+                frame = frame_queue.get(timeout=0.5)
+            except queue.Empty:
+                # No frame yet — keep checking stop_event
+                key = cv2.waitKey(1) & 0xFF
+                if key == ord("q"):
                     break
                 continue
-            consecutive_failures = 0
 
             h, w = frame.shape[:2]
 
@@ -168,11 +235,10 @@ def run(cfg: dict) -> None:
             if undistort_maps is not None:
                 frame = undistort(frame, undistort_maps)
 
-            rgb_frame    = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            rgb_frame     = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             effective_mtx = mtx if mtx is not None else fallback_mtx
 
             try:
-                # Suppress noisy stdout from model libraries
                 sys.stdout = open(os.devnull, "w")
                 raw_depth = estimate_depth(rgb_frame, model, mtx, device, hw)
                 sys.stdout = sys.__stdout__
@@ -192,7 +258,6 @@ def run(cfg: dict) -> None:
                         depth_mode                = hw.depth_mode,
                     )
 
-                    # Path planning
                     try:
                         start_point = find_starting_point(ground_mask)
                         end_point   = find_ending_point(ground_mask)
@@ -209,11 +274,8 @@ def run(cfg: dict) -> None:
                     end_point   = None
 
                 frame_view = overlay_ground(frame, ground_mask, ground_colour, vis_cfg["ground_overlay_alpha"])
-
                 frame_view = overlay_path(frame_view, path, start_point, end_point)
-
                 add_status_bar(frame_view, prev_plane)
-
                 cv2.imshow(vis_cfg["window_title"], frame_view)
 
             except RuntimeError as exc:
@@ -224,13 +286,15 @@ def run(cfg: dict) -> None:
             key = cv2.waitKey(1) & 0xFF
             if key == ord("q"):
                 break
-            if key == ord("s"):
+            if key == ord("s") and depth_map is not None and ground_mask is not None:
                 save_depth_map(depth_map, dep_cfg["depth_map_save_location"])
                 save_ground_mask(ground_mask, gnd_cfg["ground_map_save_location"])
 
     except KeyboardInterrupt:
         print("Interrupted.")
     finally:
+        stop_event.set()
+        capture_thread.join(timeout=2.0)
         cap.release()
         cv2.destroyAllWindows()
 
