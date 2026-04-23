@@ -1,13 +1,62 @@
 \chapter{Metodologie}
 \label{chap:ch3}
 
-\par Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum
-
-
 \section{Arhitectura Generală}
 \label{sec:ch3sec1}
 
-\par Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum
+\par Sistemul utilizează o cameră video pentru achiziția de date vizuale în timp real. Deoarece obiectivele camerelor introduc frecvent distorsiuni geometrice (în special spre extremitățile cadrului), este necesară o etapă preliminară de calibrare pentru rectificarea imaginilor. Parametrii de calibrare sunt stocați în sistem, astfel încât procesul nu necesită rulări repetate, deși utilizatorul poate opta pentru o nouă calibrare oricând este necesar.
+
+După captare și rectificare, cadrul video este procesat de un model de estimare monoculară a adâncimii pentru a genera o hartă de adâncime (\textit{depth map}). Următoarea etapă constă în identificarea suprafeței de rulare. În această lucrare, algoritmul de detecție vizează exclusiv planuri orizontale, netede și continue, pe care le vom defini generic sub termenul de ,,sol''.
+
+În final, integrând datele din harta de adâncime cu geometria planului solului, sistemul stabilește două puncte de referință în spațiul 3D proiectat. Un algoritm de planificare a traseului (\textit{pathfinding}) calculează apoi drumul de lungime minimă între aceste puncte, evitând obstacolele detectate în scenă. Fluxul logic al procesării datelor este sintetizat în diagrama \ref{fig:data_flow}.
+
+\begin{figure}[h]
+    \centering
+    \begin{tikzpicture}[node distance=2cm]
+
+        % --- Fluxul Principal ---
+
+        % Pas 1: Input
+        \node (input) [io] {Captură Video (Real-time)};
+
+        % Pas 2: Calibrare
+        \node (calib) [process, below of=input] {Calibrare și Rectificare \\ (Corecție Distorsiune)};
+
+        % Pas 3: Depth Estimation
+        \node (depth) [process, below of=calib, yshift=-0.5cm] {Estimare Monoculară \\ a Adâncimii};
+
+        % Pas 4: Ground Detection
+        \node (ground) [process, below of=depth] {Detecția Suprafeței \\ (Planul Pământului)};
+
+        % Pas 5: Pathfinding
+        \node (path) [process, below of=ground] {Algoritm Pathfinding \\ (Drum Minim)};
+
+        % Pas 6: Output
+        \node (output) [io, below of=path] {Sistem de Ocolire Obstacole};
+
+        % --- Elemente Auxiliare (Logica de Calibrare) ---
+
+        % Storage pentru calibrare
+        \node (data) [storage, right=2cm of calib] {Date de \\ Calibrare};
+
+        % --- Săgeți și Conexiuni ---
+
+        \draw [arrow] (input) -- (calib);
+        \draw [arrow] (calib) -- (depth);
+        \draw [arrow] (depth) -- (ground);
+        \draw [arrow] (ground) -- (path);
+        \draw [arrow] (path) -- (output);
+
+        % Fluxul de date pentru calibrare (bidirecțional conform descrierii tale)
+        \draw [arrow, <->, dashed] (calib) -- (data);
+
+        % Adnotare pentru calibrare
+        \node [right=0.2cm of data, text width=3cm, font=\footnotesize\itshape] {Salvate în sistem; pot fi actualizate la cerere.};
+
+    \end{tikzpicture}
+    \caption{Diagrama fluxului de date și a procesării în sistemul de asistență la mobilitate.}
+    \label{fig:data_flow}
+\end{figure}
 
 \section{Caracteristicile Dispozitivului Hardware Folosit}
 \label{sec:ch3sec2}
@@ -15,19 +64,40 @@
 \section{Calibrarea Camerei}
 \label{sec:ch3sec3}
 
-\par Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum
+\par Calibrarea camerei reprezintă un pas esențial în extragerea informațiilor metrice din imagini 2D. În cadrul acestui sistem este utilizată metoda propusă de Zhang \cite{zhang2000}, care necesită doar observarea unui șablon plan din câteva orientări diferite, fără echipament special.
+
+Camera este modelată prin modelul pinhole standard, în care relația dintre un punct 3D $\mathbf{M}$ și proiecția sa în imagine $\mathbf{m}$ este:
+
+\begin{equation}
+    s\tilde{\mathbf{m}} = \mathbf{A} \begin{bmatrix} \mathbf{R} & \mathbf{t} \end{bmatrix} \tilde{\mathbf{M}}
+\end{equation}
+
+unde $s$ este un factor de scală arbitrar, $\tilde{\mathbf{m}}$ și $\tilde{\mathbf{M}}$ reprezintă coordonatele omogene ale punctului din imagine și respectiv din spațiul 3D, iar $\mathbf{R} \in \mathbb{R}^{3\times 3}$ și $\mathbf{t} \in \mathbb{R}^3$ sunt parametrii extrinseci — matricea de rotație și vectorul de translație — care descriu poziția și orientarea camerei față de sistemul de coordonate al lumii. $\mathbf{A}$ este matricea intrinsecă a camerei:
+
+\begin{equation}
+    \mathbf{A} = \begin{bmatrix} \alpha & \gamma & u_0 \\ 0 & \beta & v_0 \\ 0 & 0 & 1 \end{bmatrix}
+\end{equation}
+
+unde $\alpha$ și $\beta$ sunt lungimile focale exprimate în pixeli pe axele orizontală și verticală, $(u_0, v_0)$ este punctul principal reprezentând intersecția axei optice cu planul imaginii, iar $\gamma$ descrie oblicitatea axelor imaginii — neglijabilă în cazul camerelor
+digitale moderne.
+
+Calibrarea estimează matricea $\mathbf{A}$ și coeficienții de distorsiune radială prin minimizarea erorii de reproiecție pe un set de imagini ale unui șablon de tip tablă de șah cu dimensiuni cunoscute. Soluția constă dintr-o estimare inițială în formă închisă, rafinată ulterior prin algoritmul Levenberg-Marquardt \cite{zhang2000}.
+
+Parametrii obținuți sunt utilizați în două etape ale procesării. În primul rând, fiecare cadru este rectificat geometric pentru a elimina distorsiunile radiale ale obiectivului, asigurând consistența cu modelul pinhole. În al doilea rând, lungimea focală medie $f = (\alpha +
+\beta)/2$ este utilizată pentru conversia ieșirii modelului de adâncime în metri, conform formulei \cite{depthanything3}:
+
+\begin{equation}
+    d_{\text{metric}} = \frac{f \cdot d_{\text{raw}}}{300}
+\end{equation}
+
+unde $d_{\text{raw}}$ reprezintă valoarea brută estimată de model, iar constanta $300$ provine din transformarea spațiului canonic al camerei utilizată în antrenarea modelului \cite{depthanything3}. În absența calibrării, lungimea focală este estimată presupunând un câmp vizual orizontal de $70°$, permițând funcționarea sistemului cu o precizie metrică redusă.
 
 
-\section{Alegerea Modelului AI de Estimare a Adâncimi}
+\section{Modelul Monocular de Estimare a Adâncimii}
 \label{sec:ch3sec4}
 
-\subsection{Relativ vs. Metric}
-\label{subsec:ch3sec4subsec1}
+\section{Detecția Solului}
+\label{sec:ch3sec5}
 
-\par Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum
-
-\subsection{Numărul de Parametrii}
-\label{subsec:ch3sec4subsec2}
-
-\subsection{Performanța în Timp Real}
-\label{subsec:ch3sec4subsec3}
+\section{Detecția Drumului de Cost Minim}
+\label{sec:ch3sec6}

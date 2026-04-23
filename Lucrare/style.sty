@@ -9,6 +9,48 @@
 \usepackage[unicode]{hyperref}                  % references from the table of contents
 \usepackage{etoolbox,ifthen} 	                % ifthen type of commands
 \usepackage{kvoptions}	                        % define key/value pairs as options for packages and classes
+\usepackage{tikz}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, shadow}
+
+% Definirea stilurilor de blocuri
+\tikzset{
+    io/.style = {
+        trapezium,
+        trapezium left angle=70,
+        trapezium right angle=110,
+        minimum width=3cm,
+        minimum height=1cm,
+        text centered,
+        draw=black,
+        fill=blue!10,
+        thick,
+        align=center
+    },
+    process/.style = {
+        rectangle,
+        minimum width=3.5cm,
+        minimum height=1.2cm,
+        text centered,
+        draw=black,
+        fill=orange!5,
+        thick,
+        align=center
+    },
+    storage/.style = {
+        cylinder,
+        draw,
+        shape border rotate=90,
+        minimum width=1.5cm,
+        minimum height=1cm,
+        text centered,
+        font=\small,
+        fill=gray!10,
+        align=center
+    },
+    arrow/.style = {thick, ->, >=Stealth}
+}
 
 % package options
 \geometry{  a4paper,        
