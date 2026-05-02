@@ -12,11 +12,7 @@ def visualize_depth(depth_map: np.ndarray) -> Tuple[np.ndarray, float, float]:
 
 def make_colorbar(height: int, width: int, min_depth: float, max_depth: float,
                   depth_mode: str = "metric") -> np.ndarray:
-    """Vertical INFERNO colorbar with depth tick labels.
-
-    Labels show metres when depth_mode="metric", or a unitless 0-1 scale
-    when depth_mode="relative".
-    """
+    """Vertical INFERNO colorbar with depth tick labels."""
     gradient = np.tile(np.linspace(255, 0, height, dtype=np.uint8).reshape(height, 1), (1, width))
     bar = cv2.applyColorMap(gradient, cv2.COLORMAP_INFERNO)
 
@@ -26,7 +22,7 @@ def make_colorbar(height: int, width: int, min_depth: float, max_depth: float,
         y     = max(int(frac * (height - 1)), 10)
         value = max_depth - frac * (max_depth - min_depth)
         label = f"{value:.2f}{unit}"
-        cv2.putText(bar, label, (4, y), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 2, cv2.LINE_AA)
+        cv2.putText(bar, label, (4, y), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0),   2, cv2.LINE_AA)
         cv2.putText(bar, label, (4, y), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
 
     return bar
@@ -49,25 +45,28 @@ def overlay_ground(
     return blended
 
 
-def overlay_path(image: np.ndarray, path: np.ndarray, start: Tuple[int, int], end: Tuple[int, int]) -> np.ndarray:
+def overlay_path(
+    image: np.ndarray,
+    path: np.ndarray,
+    start: Optional[Tuple[int, int]],
+    end: Optional[Tuple[int, int]],
+) -> np.ndarray:
     """Overlay the A* path, start, and end markers onto an image (in-place copy)."""
     out = image.copy()
 
     if len(path) >= 2:
         for i in range(len(path) - 1):
-            pt1 = (int(path[i,     1]), int(path[i,     0]))  # (col, row) → (x, y)
+            pt1 = (int(path[i,     1]), int(path[i,     0]))
             pt2 = (int(path[i + 1, 1]), int(path[i + 1, 0]))
             cv2.line(out, pt1, pt2, color=(0, 255, 255), thickness=2, lineType=cv2.LINE_AA)
 
-    # Start marker — green circle
     if start is not None:
-        cv2.circle(out, (int(start[1]), int(start[0])), radius=6, color=(0, 255, 0),  thickness=-1)
-        cv2.circle(out, (int(start[1]), int(start[0])), radius=6, color=(0, 0, 0),    thickness=1)
+        cv2.circle(out, (int(start[1]), int(start[0])), radius=6, color=(0, 255, 0), thickness=-1)
+        cv2.circle(out, (int(start[1]), int(start[0])), radius=6, color=(0, 0, 0),   thickness=1)
 
-    # End marker — red circle
     if end is not None:
-        cv2.circle(out, (int(end[1]),   int(end[0])),   radius=6, color=(0, 0, 255),  thickness=-1)
-        cv2.circle(out, (int(end[1]),   int(end[0])),   radius=6, color=(0, 0, 0),    thickness=1)
+        cv2.circle(out, (int(end[1]),   int(end[0])),   radius=6, color=(0, 0, 255), thickness=-1)
+        cv2.circle(out, (int(end[1]),   int(end[0])),   radius=6, color=(0, 0, 0),   thickness=1)
 
     return out
 
@@ -91,10 +90,10 @@ def save_depth_map(depth_map: np.ndarray, path: str) -> None:
     except Exception as e:
         print(f"Could not save depth map: {e}")
 
+
 def save_ground_mask(ground_mask: np.ndarray, path: str) -> None:
     try:
         np.save(path, ground_mask)
         print(f"Ground mask saved to '{path}'.")
     except Exception as e:
         print(f"Could not save ground mask: {e}")
-

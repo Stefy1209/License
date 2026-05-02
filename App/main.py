@@ -1,314 +1,70 @@
 """
 main.py — Entry point for the depth-based ground detection and path planning system.
 
-Hardware profiles
------------------
-Set  [hardware] profile = "nvidia"  or  "rpi"  in config.toml.
-
-  nvidia : NVIDIA GPU host — PyTorch + CUDA inference via DepthAnything3.
-  rpi    : Raspberry Pi 5 + AI HAT+ (Hailo-8 NPU) — hailort inference,
-           picamera2 camera capture.
-
-Calibration
------------
-If the calibration file is missing at startup, the user is prompted:
-  * Run calibration now   -> runs run_calibration() then continues.
-  * Skip (use fallback)   -> continues with an estimated camera matrix.
-  * Quit                  -> exits cleanly.
-
-Threading
----------
-Camera capture runs in a dedicated background thread so the sensor is
-always reading at full speed.  The main thread pulls the most recent
-frame and runs inference + ground detection + path planning + display.
-This eliminates the stutter caused by the camera blocking on inference.
+    python main.py                     GUI mode (default)
+    python main.py --headless          Terminal / headless mode
+    python main.py --config path.toml  Use a custom config file
 """
 
 from __future__ import annotations
-
-import os
-import sys
 import argparse
-import threading
-import queue
-import numpy as np
-import cv2
-
-from config_loader  import load_config
-from hardware       import get_profile, HardwareProfile
-from calibration    import load_calibration, run_calibration
-from camera         import open_camera, build_undistort_maps, build_fallback_intrinsics, undistort
-from model          import load_model, estimate_depth
-from ground         import detect_ground_mask
-from path           import find_starting_point, find_ending_point, find_path
-from visualization  import (
-    overlay_ground, overlay_path,
-    add_status_bar, save_depth_map, save_ground_mask,
-)
 
 
-# ---------------------------------------------------------------------------
-# Calibration prompt
-# ---------------------------------------------------------------------------
+def _run_headless(config_path: str) -> None:
+    import cv2
+    from config import AppConfig
+    from hardware import HardwareProfile
+    from pipeline import DepthPipeline
+    from visualization import overlay_ground, overlay_path, add_status_bar
 
-def _prompt_calibration(cal_cfg: dict, cam_cfg: dict) -> None:
-    """
-    If the calibration file is absent, ask the user what to do. 
+    cfg = AppConfig.load(config_path)
+    hw  = HardwareProfile.from_config(cfg)
+    pipeline = DepthPipeline(cfg, hw)
+    pipeline.load_calibration()
+    pipeline.load_model()
+    pipeline.start_capture()
 
-    Options
-    -------
-    c — run interactive checkerboard calibration then continue.
-    s — skip calibration (main loop will use a fallback intrinsics estimate).
-    q — quit the program.
-    """
-    cal_file = cal_cfg["file"]
-    if os.path.exists(cal_file):
-        return
-
-    print(
-        f"\nCalibration file '{cal_file}' not found.\n"
-        "  [c] Run camera calibration now\n"
-        "  [s] Skip (use fallback intrinsics — accuracy may be reduced)\n"
-        "  [q] Quit\n"
-    )
-
-    while True:
-        choice = input("Your choice [c/s/q]: ").strip().lower()
-        if choice == "q":
-            sys.exit("Exiting.")
-        if choice == "s":
-            print("Skipping calibration. Continuing with fallback intrinsics.")
-            return
-        if choice == "c":
-            print("Starting calibration…  (press 'q' inside the window to abort)\n")
-            run_calibration(
-                camera_id  = cam_cfg["id"],
-                out_path   = cal_file,
-                cols       = cal_cfg["cols"],
-                rows       = cal_cfg["rows"],
-                square_mm  = cal_cfg["square_mm"],
-                min_frames = cal_cfg["min_frames"],
-            )
-            if os.path.exists(cal_file):
-                print("Calibration complete.\n")
-            else:
-                print("Calibration was not saved (window closed early). Using fallback.\n")
-            return
-        print("Please enter 'c', 's', or 'q'.")
-
-
-# ---------------------------------------------------------------------------
-# Capture thread
-# ---------------------------------------------------------------------------
-
-def _capture_worker(
-    cap,
-    frame_queue: queue.Queue,
-    stop_event: threading.Event,
-    max_retries: int,
-) -> None:
-    """
-    Continuously read frames from *cap* and put the latest one into
-    *frame_queue*.
-
-    The queue holds at most 1 item — if the main thread is busy the old
-    frame is discarded so the display always shows the most recent image
-    rather than falling further behind.
-
-    Stops when *stop_event* is set or too many consecutive failures occur.
-    """
-    consecutive_failures = 0
-
-    while not stop_event.is_set():
-        ret, frame = cap.read()
-        if not ret:
-            consecutive_failures += 1
-            if consecutive_failures >= max_retries:
-                print("Capture thread: too many camera failures. Stopping.")
-                stop_event.set()
-            continue
-        consecutive_failures = 0
-
-        # Discard stale frame if main thread hasn't consumed it yet
-        if not frame_queue.empty():
-            try:
-                frame_queue.get_nowait()
-            except queue.Empty:
-                pass
-
-        frame_queue.put(frame)
-
-
-# ---------------------------------------------------------------------------
-# Main loop
-# ---------------------------------------------------------------------------
-
-def run(cfg: dict) -> None:
-    cam_cfg = cfg["camera"]
-    cal_cfg = cfg["calibration"]
-    mdl_cfg = cfg["model"]
-    dep_cfg = cfg["depth"]
-    gnd_cfg = cfg["ground"]
-    vis_cfg = cfg["visualization"]
-
-    ground_colour = tuple(vis_cfg["ground_colour_bgr"])
-
-    # ------------------------------------------------------------------ #
-    #  Hardware profile                                                    #
-    # ------------------------------------------------------------------ #
-    hw     = get_profile(cfg)
-    device = hw.torch_device()
-    print(f"Hardware profile : {hw.profile}  |  device : {device}")
-
-    # ------------------------------------------------------------------ #
-    #  Calibration                                                         #
-    # ------------------------------------------------------------------ #
-    _prompt_calibration(cal_cfg, cam_cfg)
-
-    mtx = dist = undistort_maps = None
+    print("Press 'q' to quit, 's' to save outputs.")
     try:
-        mtx, dist = load_calibration(cal_cfg["file"])
-        print("Calibration loaded.")
-    except Exception as exc:
-        print(f"No calibration: {exc}. Running with fallback intrinsics.")
-
-    # ------------------------------------------------------------------ #
-    #  Model                                                               #
-    # ------------------------------------------------------------------ #
-    print(f"Loading depth model ({hw.profile} backend)…")
-    model = load_model(mdl_cfg["id"], device, hw, cfg)
-
-    # ------------------------------------------------------------------ #
-    #  Camera                                                              #
-    # ------------------------------------------------------------------ #
-    cap = open_camera(
-        cam_cfg["id"],
-        hw,
-        width  = cam_cfg.get("width",  640),
-        height = cam_cfg.get("height", 480),
-    )
-
-    # ------------------------------------------------------------------ #
-    #  Start capture thread                                                #
-    # ------------------------------------------------------------------ #
-    frame_queue = queue.Queue(maxsize=1)
-    stop_event  = threading.Event()
-
-    capture_thread = threading.Thread(
-        target=_capture_worker,
-        args=(cap, frame_queue, stop_event, cam_cfg["max_read_retries"]),
-        daemon=True,
-        name="capture",
-    )
-    capture_thread.start()
-    print("Press 'q' to quit, 's' to save the current depth map and ground mask.")
-
-    prev_plane  = None
-    fallback_mtx = None
-    path        = np.empty((0, 2), dtype=int)
-    start_point = None
-    end_point   = None
-    depth_map   = None
-    ground_mask = None
-
-    try:
-        while not stop_event.is_set():
-
-            # ---- Grab the latest frame (block up to 500 ms) ----
-            try:
-                frame = frame_queue.get(timeout=0.5)
-            except queue.Empty:
-                # No frame yet — keep checking stop_event
-                key = cv2.waitKey(1) & 0xFF
-                if key == ord("q"):
+        while not pipeline.is_stopped():
+            result = pipeline.process_next_frame(timeout=0.5)
+            if result is None:
+                if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
                 continue
-
-            h, w = frame.shape[:2]
-
-            # Build helpers once frame size is known
-            if mtx is not None and dist is not None and undistort_maps is None:
-                undistort_maps = build_undistort_maps(mtx, dist, (w, h))
-            if mtx is None and fallback_mtx is None:
-                fallback_mtx = build_fallback_intrinsics(w, h)
-
-            if undistort_maps is not None:
-                frame = undistort(frame, undistort_maps)
-
-            rgb_frame     = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            effective_mtx = mtx if mtx is not None else fallback_mtx
-
-            try:
-                sys.stdout = open(os.devnull, "w")
-                raw_depth = estimate_depth(rgb_frame, model, mtx, device, hw)
-                sys.stdout = sys.__stdout__
-
-                depth_map = cv2.resize(raw_depth, (w, h), interpolation=cv2.INTER_LINEAR)
-
-                if effective_mtx is not None:
-                    ground_mask, prev_plane = detect_ground_mask(
-                        depth_map, effective_mtx,
-                        seed_region               = gnd_cfg["seed_region"],
-                        ransac_threshold_metric   = gnd_cfg["ransac_threshold_metric"],
-                        ransac_threshold_relative = gnd_cfg["ransac_threshold_relative"],
-                        ransac_iterations         = gnd_cfg["ransac_iterations"],
-                        plane_smoothing           = gnd_cfg["plane_smoothing"],
-                        normal_threshold          = gnd_cfg["normal_threshold"],
-                        prev_plane                = prev_plane,
-                        depth_mode                = hw.depth_mode,
-                    )
-
-                    try:
-                        start_point = find_starting_point(ground_mask)
-                        end_point   = find_ending_point(ground_mask)
-                        path        = find_path(ground_mask, start_point, end_point)
-                    except ValueError:
-                        path        = np.empty((0, 2), dtype=int)
-                        start_point = None
-                        end_point   = None
-
-                else:
-                    ground_mask = np.zeros((h, w), dtype=bool)
-                    path        = np.empty((0, 2), dtype=int)
-                    start_point = None
-                    end_point   = None
-
-                frame_view = overlay_ground(frame, ground_mask, ground_colour, vis_cfg["ground_overlay_alpha"])
-                frame_view = overlay_path(frame_view, path, start_point, end_point)
-                add_status_bar(frame_view, prev_plane)
-                cv2.imshow(vis_cfg["window_title"], frame_view)
-
-            except RuntimeError as exc:
-                sys.stdout = sys.__stdout__
-                print(f"Inference error: {exc}")
-                break
-
+            frame = result.rgb_frame
+            colour_bgr = tuple(cfg.visualization.ground_colour_bgr)
+            if result.ground_mask is not None:
+                frame = overlay_ground(frame, result.ground_mask, colour_bgr,
+                                       cfg.visualization.ground_overlay_alpha)
+            if result.path is not None:
+                frame = overlay_path(frame, result.path, result.start_point, result.end_point)
+            add_status_bar(frame, result.plane)
+            cv2.imshow(cfg.visualization.window_title, frame)
             key = cv2.waitKey(1) & 0xFF
             if key == ord("q"):
                 break
-            if key == ord("s") and depth_map is not None and ground_mask is not None:
-                save_depth_map(depth_map, dep_cfg["depth_map_save_location"])
-                save_ground_mask(ground_mask, gnd_cfg["ground_map_save_location"])
-
+            if key == ord("s"):
+                pipeline.save_outputs(result)
     except KeyboardInterrupt:
         print("Interrupted.")
     finally:
-        stop_event.set()
-        capture_thread.join(timeout=2.0)
-        cap.release()
+        pipeline.stop()
         cv2.destroyAllWindows()
 
 
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Depth-based ground detection and path planning.")
+    parser.add_argument("--config",   default="config.toml")
+    parser.add_argument("--headless", action="store_true")
+    args = parser.parse_args()
+
+    if args.headless:
+        _run_headless(args.config)
+    else:
+        from gui import run
+        run(args.config)
+
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Depth-based ground detection and path planning.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-    parser.add_argument("--config", default="config.toml",
-                        help="Path to TOML configuration file.")
-    args = parser.parse_args()
-    run(load_config(args.config))
+    main()

@@ -1,10 +1,42 @@
+from __future__ import annotations
+
 import sys
 import argparse
 import numpy as np
 import cv2 as cv
-from typing import Optional, Tuple
+from typing import Tuple
 
-from config_loader import load_config
+from config import AppConfig
+
+
+class CalibrationService:
+    """Handles loading and running camera calibration."""
+
+    def __init__(self, cfg: AppConfig) -> None:
+        self._cfg = cfg
+
+    def load(self) -> Tuple[np.ndarray, np.ndarray]:
+        """Return (camera_matrix, dist_coefficients) from the configured .npz file."""
+        path = self._cfg.calibration.file
+        with np.load(path) as data:
+            mtx  = data.get("mtx")  or data.get("K")  or data.get("camera_matrix")
+            dist = data.get("dist") or data.get("D")  or data.get("distortion_coefficients")
+        if mtx is None or dist is None:
+            raise ValueError("Calibration file missing 'mtx'/'K' or 'dist'/'D' keys.")
+        return mtx, dist
+
+    def run_interactive(self) -> None:
+        """Run the interactive checkerboard calibration routine."""
+        cal = self._cfg.calibration
+        cam = self._cfg.camera
+        _run_calibration(
+            camera_id  = cam.id,
+            out_path   = cal.file,
+            cols       = cal.cols,
+            rows       = cal.rows,
+            square_mm  = cal.square_mm,
+            min_frames = cal.min_frames,
+        )
 
 
 def load_calibration(path: str) -> Tuple[np.ndarray, np.ndarray]:
@@ -17,7 +49,7 @@ def load_calibration(path: str) -> Tuple[np.ndarray, np.ndarray]:
     return mtx, dist
 
 
-def run_calibration(
+def _run_calibration(
     camera_id: int,
     out_path: str,
     cols: int,
@@ -79,8 +111,10 @@ def run_calibration(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="OpenCV checkerboard camera calibration",
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description="OpenCV checkerboard camera calibration",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
     parser.add_argument("--config", default="config.toml")
     parser.add_argument("--camera", type=int,   default=None)
     parser.add_argument("--out",    type=str,   default=None)
@@ -89,12 +123,12 @@ if __name__ == "__main__":
     parser.add_argument("--square", type=float, default=None)
     args = parser.parse_args()
 
-    cfg = load_config(args.config)
-    run_calibration(
-        camera_id = args.camera if args.camera is not None else cfg["camera"]["id"],
-        out_path  = args.out    if args.out    is not None else cfg["calibration"]["file"],
-        cols      = args.cols   if args.cols   is not None else cfg["calibration"]["cols"],
-        rows      = args.rows   if args.rows   is not None else cfg["calibration"]["rows"],
-        square_mm = args.square if args.square is not None else cfg["calibration"]["square_mm"],
-        min_frames= cfg["calibration"]["min_frames"],
+    cfg = AppConfig.load(args.config)
+    _run_calibration(
+        camera_id  = args.camera    if args.camera is not None else cfg.calibration.id,
+        out_path   = args.out       if args.out    is not None else cfg.calibration.file,
+        cols       = args.cols      if args.cols   is not None else cfg.calibration.cols,
+        rows       = args.rows      if args.rows   is not None else cfg.calibration.rows,
+        square_mm  = args.square    if args.square is not None else cfg.calibration.square_mm,
+        min_frames = cfg.calibration.min_frames,
     )
