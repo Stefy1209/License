@@ -6,6 +6,32 @@
 
 \par Fundamentul oricărei analize metrice dintr-o imagine este stabilit prin calibrarea camerei. În lucrarea sa de referință, Zhang \cite{zhang2000} propune o tehnică flexibilă care a democratizat accesul la viziunea 3D prin eliminarea necesității unor aparate de calibrare costisitoare. Autorul demonstrează că utilizarea unui model plan (checkerboard) observat din cel puțin două orientări diferite este suficientă pentru a determina parametrii intrinseci și extrinseci ai camerei. Metoda se bazează pe calculul homografiei între planul modelului și proiecția sa în imagine, urmată de o rafinare neliniară prin criteriul verosimilității maxime care ia în considerare și distorsiunile radiale ale lentilei. Această abordare a transformat calibrarea dintr-un proces restrictiv de laborator într-o procedură aplicabilă în scenarii de utilizare reală.
 
+Camera este modelată prin modelul pinhole standard, în care relația dintre un punct 3D $\mathbf{M}$ și proiecția sa în imagine $\mathbf{m}$ este:
+
+\begin{equation}
+    s\tilde{\mathbf{m}} = \mathbf{A} \begin{bmatrix} \mathbf{R} & \mathbf{t} \end{bmatrix} \tilde{\mathbf{M}}
+\end{equation}
+
+unde $s$ este un factor de scală arbitrar, $\tilde{\mathbf{m}}$ și $\tilde{\mathbf{M}}$ reprezintă coordonatele omogene ale punctului din imagine și respectiv din spațiul 3D, iar $\mathbf{R} \in \mathbb{R}^{3\times 3}$ și $\mathbf{t} \in \mathbb{R}^3$ sunt parametrii extrinseci — matricea de rotație și vectorul de translație — care descriu poziția și orientarea camerei față de sistemul de coordonate al lumii. $\mathbf{A}$ este matricea intrinsecă a camerei:
+
+\begin{equation}
+    \mathbf{A} = \begin{bmatrix} \alpha & \gamma & u_0 \\ 0 & \beta & v_0 \\ 0 & 0 & 1 \end{bmatrix}
+\end{equation}
+
+unde $\alpha$ și $\beta$ sunt lungimile focale exprimate în pixeli pe axele orizontală și verticală, $(u_0, v_0)$ este punctul principal reprezentând intersecția axei optice cu planul imaginii, iar $\gamma$ descrie oblicitatea axelor imaginii — neglijabilă în cazul camerelor
+digitale moderne.
+
+Calibrarea estimează matricea $\mathbf{A}$ și coeficienții de distorsiune radială prin minimizarea erorii de reproiecție pe un set de imagini ale unui șablon de tip tablă de șah cu dimensiuni cunoscute. Soluția constă dintr-o estimare inițială în formă închisă, rafinată ulterior prin algoritmul Levenberg-Marquardt \cite{zhang2000}.
+
+Parametrii obținuți sunt utilizați în două etape ale procesării. În primul rând, fiecare cadru este rectificat geometric pentru a elimina distorsiunile radiale ale obiectivului, asigurând consistența cu modelul pinhole. În al doilea rând, lungimea focală medie $f = (\alpha +
+\beta)/2$ este utilizată pentru conversia ieșirii modelului de adâncime în metri, conform formulei \cite{depthanything3}:
+
+\begin{equation}
+    d_{\text{metric}} = \frac{f \cdot d_{\text{raw}}}{300}
+\end{equation}
+
+unde $d_{\text{raw}}$ reprezintă valoarea brută estimată de model, iar constanta $300$ provine din transformarea spațiului canonic al camerei utilizată în antrenarea modelului \cite{depthanything3}. În absența calibrării, lungimea focală este estimată presupunând un câmp vizual orizontal de $70°$, permițând funcționarea sistemului cu o precizie metrică redusă.
+
 \section{Estimarea Adâncimilor cu Ajutorul Modelelor AI}
 \label{sec:ch2sec2}
 

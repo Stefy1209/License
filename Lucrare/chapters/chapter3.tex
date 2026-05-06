@@ -58,46 +58,129 @@ După captare și rectificare, cadrul video este procesat de un model de estimar
     \label{fig:data_flow}
 \end{figure}
 
-\section{Caracteristicile Dispozitivului Hardware Folosit}
+\section{Caracteristicile Dispozitivelor Hardware Folosite}
 \label{sec:ch3sec2}
+
+\par Dezvoltarea sistemului s-a desfășurat în două etape distincte. Într-o primă fază, implementarea și testarea au fost realizate pe un laptop echipat cu placă grafică dedicată, urmând ca ulterior sistemul să fie adaptat și optimizat pentru a rula pe un dispozitiv cu resurse limitate, respectiv un Raspberry Pi în combinație cu un accelerator neuronal dedicat.
+
+\par Laptopul utilizat este un Lenovo Legion Pro 5 16IAX10H, echipat cu un procesor Intel Core Ultra 9 275HX, cu 24 de nuclee și o frecvență maximă de 5,40 GHz \cite{intel_core_ultra9_275hx}, și o placă grafică NVIDIA GeForce RTX 5070 Ti Mobile, cu 12 GB memorie VRAM dedicată și un TDP configurabil de până la 140W.
+
+\par Platforma embedded este reprezentată de un Raspberry Pi 5 cu 8 GB RAM \cite{raspberrypi5}, la care s-a atașat modulul Raspberry Pi AI HAT+, un accelerator neuronal cu o putere de procesare de 26 TOPS, bazat pe procesorul Hailo-8 \cite{raspberrypi_aihat}. Implicațiile acestei configurații asupra performanței sistemului, atât avantajele, cât și limitările impuse, sunt discutate în detaliu în secțiunea~\ref{sec:ch3sec4}, dedicată modelelor monoculare de estimare a adâncimii.
 
 \section{Calibrarea Camerei}
 \label{sec:ch3sec3}
 
-\par Calibrarea camerei reprezintă un pas esențial în extragerea informațiilor metrice din imagini 2D. În cadrul acestui sistem este utilizată metoda propusă de Zhang \cite{zhang2000}, care necesită doar observarea unui șablon plan din câteva orientări diferite, fără echipament special.
+\par Calibrarea camerei reprezintă un pas esențial în obținerea unor estimări metrice precise ale adâncimii, în special atunci când se utilizează un model monocular metric de estimare a adâncimii. Procesul de calibrare determină parametrii intrinseci ai camerei, distanța focală și punctul principal, precum și coeficienții de distorsiune, care modelează deformările geometrice introduse de lentilă, cel mai frecvent manifestate la marginile imaginii. Fără corectarea acestor distorsiuni, estimările de adâncime ar acumula erori ce pot afecta semnificativ precizia sistemului de evitare a obstacolelor.
 
-Camera este modelată prin modelul pinhole standard, în care relația dintre un punct 3D $\mathbf{M}$ și proiecția sa în imagine $\mathbf{m}$ este:
+\par Metoda utilizată se bazează pe tehnica de calibrare propusă de Zhang \cite{zhang2000}, implementată în biblioteca OpenCV. Aceasta presupune captarea mai multor imagini ale unui panou de calibrare cu model de tablă de șah (\textit{checkerboard}) din unghiuri și distanțe variate, permițând estimarea robustă a parametrilor camerei prin minimizarea erorii de reproiecție.
 
-\begin{equation}
-    s\tilde{\mathbf{m}} = \mathbf{A} \begin{bmatrix} \mathbf{R} & \mathbf{t} \end{bmatrix} \tilde{\mathbf{M}}
-\end{equation}
+\par Algoritmul de calibrare utilizează patru parametrii configurabili: \texttt{cols}, \texttt{rows}, \texttt{square\_mm} și \texttt{min\_frames}. Parametrii \texttt{cols} și \texttt{rows} definesc numărul de colțuri interioare detectabile ale tablei de șah pe orizontală, respectiv verticală. Parametrul \texttt{square\_mm} specifică dimensiunea reală a laturii unui pătrat, exprimată în milimetri, valoare necesară pentru a stabili corespondența dintre coordonatele din spațiul real și cele din planul imaginii. În fine, \texttt{min\_frames} indică numărul minim de cadre ce trebuie captate pentru ca estimarea parametrilor să fie suficient de stabilă. Toți acești parametrii pot fi ajustați din secțiunea \textit{Settings} a aplicației, oferind flexibilitate în funcție de camera utilizată.
 
-unde $s$ este un factor de scală arbitrar, $\tilde{\mathbf{m}}$ și $\tilde{\mathbf{M}}$ reprezintă coordonatele omogene ale punctului din imagine și respectiv din spațiul 3D, iar $\mathbf{R} \in \mathbb{R}^{3\times 3}$ și $\mathbf{t} \in \mathbb{R}^3$ sunt parametrii extrinseci — matricea de rotație și vectorul de translație — care descriu poziția și orientarea camerei față de sistemul de coordonate al lumii. $\mathbf{A}$ este matricea intrinsecă a camerei:
+\par Din punct de vedere tehnic, pentru fiecare cadru în care panoul de calibrare este detectat, algoritmul rafinează pozițiile colțurilor detectate la nivel subpixel folosind metoda \texttt{cornerSubPix} din OpenCV, îmbunătățind precizia corespondenței puncte-imagine. Odată acumulate suficiente cadre (\texttt{min\_frames}), se apelează \texttt{cv.calibrateCamera}, care returnează matricea intrinsecă a camerei $\mathbf{K}$ și vectorul coeficienților de distorsiune $\mathbf{d}$.
 
-\begin{equation}
-    \mathbf{A} = \begin{bmatrix} \alpha & \gamma & u_0 \\ 0 & \beta & v_0 \\ 0 & 0 & 1 \end{bmatrix}
-\end{equation}
+\par Calitatea calibrării este evaluată prin eroarea RMS (\textit{Root Mean Square}) de reproiecție, care măsoară discrepanța medie, în pixeli, între colțurile observate și cele reproiectate pe baza parametrilor estimați. O valoare RMS sub $1.0$ este considerată acceptabilă pentru aplicații de tip vedere artificială \cite{zhang2000}. În implementarea curentă, dacă valoarea depășește acest prag, utilizatorul este avertizat și recalibrarea este recomandată.
 
-unde $\alpha$ și $\beta$ sunt lungimile focale exprimate în pixeli pe axele orizontală și verticală, $(u_0, v_0)$ este punctul principal reprezentând intersecția axei optice cu planul imaginii, iar $\gamma$ descrie oblicitatea axelor imaginii — neglijabilă în cazul camerelor
-digitale moderne.
-
-Calibrarea estimează matricea $\mathbf{A}$ și coeficienții de distorsiune radială prin minimizarea erorii de reproiecție pe un set de imagini ale unui șablon de tip tablă de șah cu dimensiuni cunoscute. Soluția constă dintr-o estimare inițială în formă închisă, rafinată ulterior prin algoritmul Levenberg-Marquardt \cite{zhang2000}.
-
-Parametrii obținuți sunt utilizați în două etape ale procesării. În primul rând, fiecare cadru este rectificat geometric pentru a elimina distorsiunile radiale ale obiectivului, asigurând consistența cu modelul pinhole. În al doilea rând, lungimea focală medie $f = (\alpha +
-\beta)/2$ este utilizată pentru conversia ieșirii modelului de adâncime în metri, conform formulei \cite{depthanything3}:
-
-\begin{equation}
-    d_{\text{metric}} = \frac{f \cdot d_{\text{raw}}}{300}
-\end{equation}
-
-unde $d_{\text{raw}}$ reprezintă valoarea brută estimată de model, iar constanta $300$ provine din transformarea spațiului canonic al camerei utilizată în antrenarea modelului \cite{depthanything3}. În absența calibrării, lungimea focală este estimată presupunând un câmp vizual orizontal de $70°$, permițând funcționarea sistemului cu o precizie metrică redusă.
-
+\par Pentru a evita repetarea procesului de calibrare la fiecare pornire a aplicației, rezultatele sunt persistate într-un fișier \texttt{.npz} (format NumPy arhivat), care stochează matricea camerei, coeficienții de distorsiune și valoarea RMS. Numele implicit al fișierului este \texttt{calibration.npz}, însă acesta poate fi modificat din secțiunea \textit{Settings}. De asemenea, utilizatorul poate exporta fișierul de calibrare sau poate importa unul existent, cu condiția că acesta a fost generat utilizând aceiași parametrii intrinseci și extrinseci.
 
 \section{Modelul Monocular de Estimare a Adâncimii}
 \label{sec:ch3sec4}
 
+\par Estimarea adâncimii dintr-o singură imagine (estimare monoculară) reprezintă o problemă fundamentală în vederea artificială, cu aplicații directe în navigație autonomă și asistarea persoanelor cu deficiențe de vedere. Spre deosebire de metodele stereoscopice sau LiDAR, abordarea monoculară nu necesită hardware specializat suplimentar, ceea ce o face potrivită pentru sisteme portabile cu resurse limitate.
+
+\par În cadrul acestui sistem au fost utilizate două modele distincte, selectate în funcție de platforma hardware disponibilă: \textbf{Depth Anything 3} pentru platforma NVIDIA și \textbf{Depth Anything 2 ViT-S} pentru Raspberry Pi 5 cu acceleratorul AI HAT+.
+
+\subsection{Depth Anything 3 (Platformă NVIDIA)}
+
+\par Depth Anything 3 \cite{depthanything3} reprezintă cea mai recentă iterație a familiei de modele Depth Anything, concepută pentru a depăși limitările versiunilor anterioare în ceea ce privește consistența spațială și generalizarea la scene diverse. În cadrul acestui sistem este utilizată varianta \texttt{DA3METRIC-LARGE}, care produce estimări de adâncime în unități metrice absolute, eliminând necesitatea unei etape suplimentare de scalare relativă.
+
+\par Modelul este încărcat prin intermediul bibliotecii PyTorch și transferat pe GPU-ul dedicat al laptopului, beneficiind de accelerarea CUDA. Pentru maximizarea performanței, inferența utilizează precizie mixtă automată (\textit{Automatic Mixed Precision} — AMP), care reduce consumul de memorie VRAM și crește debitul de procesare fără a afecta semnificativ precizia rezultatelor. De asemenea, la inițializare se încearcă compilarea statică a modelului prin \texttt{torch.compile()}, disponibilă începând cu PyTorch 2.0, care poate aduce îmbunătățiri suplimentare de latență pe hardware compatibil.
+
+\par Conversia ieșirii brute a rețelei la adâncime metrică se realizează conform formulei oficiale din documentația modelului:
+
+\begin{equation}
+    d_{\text{metric}} = \frac{f \cdot r}{300}
+\end{equation}
+
+\noindent unde $r$ reprezintă predicția brută a rețelei (valoare adimensională), iar $f$ este distanța focală medie a camerei, calculată din matricea intrinsecă $\mathbf{K}$ drept $f = (f_x + f_y) / 2$. În absența unei calibrări disponibile, distanța focală este estimată pornind de la o presupunere de câmp vizual orizontal de aproximativ $70°$, rezultând valori aproximative ale adâncimii metrice.
+
+\subsection{Depth Anything 2 ViT-S (Platformă Raspberry Pi)}
+
+\par Pentru platforma embedded, utilizarea Depth Anything 3 nu este fezabilă din cauza cerințelor computaționale ridicate ale acestuia și acceleratorului neuronal ce necesită recompilarea modelului special pentru platformă. În schimb, este utilizat modelul \textbf{Depth Anything 2} \cite{yang2024depth} în varianta \textbf{ViT-S} (\textit{Vision Transformer Small}), compilat în formatul HEF (\textit{Hailo Executable Format}) specific procesorului Hailo-8 din cadrul modulului AI HAT+. Această compilare este furnizată prin Hailo Model Zoo și permite rularea eficientă a modelului pe NPU-ul dedicat, descărcând complet procesorul ARM al Raspberry Pi-ului de sarcina de inferență.
+
+\par Pipeline-ul de inferență pe această platformă cuprinde trei etape distincte. În etapa de pre-procesare, cadrul RGB de intrare este redimensionat la rezoluția așteptată de model ($518 \times 518$ pixeli) și convertit la formatul \texttt{uint8} NHWC, normalizarea fiind gestionată intern de HEF. Inferența propriu-zisă este realizată prin SDK-ul oficial \texttt{hailort}, utilizând \textit{virtual streams} pentru comunicarea cu NPU-ul prin interfața PCIe. În etapa de post-procesare, modelul DA2 ViT-S produce o hartă de disparitate inversă (adâncime relativă inversă), în care valorile mai mari corespund obiectelor mai apropiate. Pentru a asigura consistența cu restul pipeline-ului aplicației, unde valorile mai mari de adâncime corespund distanțelor mai mari, harta este inversată și normalizată la intervalul $[0, 1]$ conform relației:
+
+\begin{equation}
+    d_{\text{norm}} = \frac{d_{\max} - d}{d_{\max} - d_{\min}}
+\end{equation}
+
+\par Această abordare implică o limitare importantă: adâncimile produse pe Raspberry Pi sunt \textit{relative}, nu metrice, ceea ce înseamnă că sistemul nu poate determina distanțele absolute față de obstacole pe această platformă. În consecință, logica de evitare a obstacolelor bazată pe algoritmul A* \cite{4082128} operează în acest caz cu valori normalizate, iar pragurile de detecție trebuie ajustate corespunzător față de configurația NVIDIA.
+
 \section{Detecția Solului}
 \label{sec:ch3sec5}
 
+\par Detecția suprafeței solului reprezintă o etapă preliminară esențială pentru algoritmul de evitare a obstacolelor, întrucât permite excluderea zonei practicabile din harta de adâncime înainte de a identifica obstacolele relevante. Fără această etapă, solul însuși ar fi interpretat ca un obstacol, perturbând planificarea traseului. Abordarea adoptată se bazează pe algoritmul RANSAC (\textit{Random Sample Consensus}) \cite{10.1145/358669.358692}, aplicat în spațiul 3D reconstituit din harta de adâncime și parametrii intrinseci ai camerei.
+
+\subsection{Proiecția Inversă și Eșantionarea Punctelor Seed}
+
+\par Prima etapă constă în selecția unui subset de puncte candidate pentru estimarea planului solului. Deoarece solul este vizibil cu precădere în zona inferioară a imaginii, algoritmul eșantionează doar o fracțiune configurabilă din partea de jos a hărții de adâncime (parametrul \texttt{seed\_region}). Pentru a limita costul computațional, se aplică un pas de subșantionare (\textit{stride} = 4), reducând numărul de pixeli evaluați, iar dacă numărul de puncte valide depășește un prag maxim (\texttt{max\_points} = 1500), se aplică o selecție aleatoare suplimentară.
+
+\par Fiecare pixel eșantionat este reproiectat din spațiul imaginii în spațiul 3D al camerei folosind relațiile geometrice standard derivate din modelul pinhole al camerei:
+
+\begin{equation}
+    X = \frac{(u - c_x) \cdot z}{f_x}, \quad
+    Y = \frac{(v - c_y) \cdot z}{f_y}, \quad
+    Z = z
+\end{equation}
+
+\noindent unde $(u, v)$ sunt coordonatele pixelului, $z$ este adâncimea estimată, iar $f_x, f_y, c_x, c_y$ sunt parametrii intrinseci ai camerei din matricea $\mathbf{K}$.
+
+\subsection{Estimarea Planului prin RANSAC Vectorizat}
+
+\par Estimarea planului solului se realizează printr-o variantă vectorizată a algoritmului RANSAC \cite{10.1145/358669.358692}, în care toate iterațiile sunt evaluate în paralel prin operații NumPy, eliminând bucla explicită și reducând semnificativ latența. La fiecare iterație, se selectează aleator câte un triplet de puncte, se calculează normala planului prin produsul vectorial, iar numărul de inlieri (puncte situate la o distanță mai mică decât pragul \texttt{threshold} față de plan) este determinat simultan pentru toate iterațiile printr-o operație matricială:
+
+\begin{equation}
+    \text{dist}(p, \pi) = | \mathbf{n}^T p + d |
+\end{equation}
+
+\noindent unde $\mathbf{n}$ este vectorul normal al planului și $d$ este termenul liber. Planul cu cel mai mare număr de inlieri este reținut, iar parametrii săi sunt rafinați ulterior printr-o descompunere SVD pe mulțimea completă de inlieri, obținând o estimare mai robustă.
+
+\par Un plan estimat este acceptat doar dacă componenta verticală a normalei sale depășește un prag configurabil (\texttt{normal\_threshold}), condiție care asigură că planul detectat este suficient de orizontal pentru a fi considerat sol și nu o suprafață verticală (perete, ușă etc.).
+
+\subsection{Netezirea Temporală și Construirea Măștii}
+
+\par Pentru a evita fluctuațiile bruște între cadre consecutive, planul estimat la fiecare cadru este combinat cu planul anterior printr-o medie ponderată exponențială:
+
+\begin{equation}
+    \pi_t = \alpha \cdot \pi_{t-1} + (1 - \alpha) \cdot \pi_{\text{raw}}
+\end{equation}
+
+\noindent unde $\alpha$ este factorul de netezire (\texttt{plane\_smoothing}), cu valori apropiate de 1 favorizând stabilitatea temporală în detrimentul reactivității la schimbări rapide ale scenei. Planul rezultat este renormalizat după fiecare actualizare pentru a menține validitatea geometrică a reprezentării.
+
+\par În final, masca binară a solului este construită direct în spațiul 2D al imaginii, fără a materializa întregul nor de puncte 3D. Pentru fiecare pixel $(u, v)$, distanța față de planul estimat este calculată vectorizat, iar pixelii a căror distanță este sub pragul \texttt{threshold} sunt marcați ca aparținând solului. Pragul în sine este adaptat în funcție de modul de operare al modelului de adâncime: în modul metric se folosește o valoare absolută în metri (\texttt{ransac\_threshold\_metric}), iar în modul relativ pragul este scalat proporțional cu intervalul dinamic al hărții de adâncime curente (\texttt{ransac\_threshold\_relative}).
+
 \section{Detecția Drumului de Cost Minim}
 \label{sec:ch3sec6}
+
+\par Odată determinată masca binară a solului practicabil, sistemul calculează un drum de cost minim între poziția curentă a utilizatorului și un punct țintă aflat în fața acestuia. Această problemă este formulată ca o căutare de drum pe un graf implicit definit de masca solului, rezolvată prin algoritmul A* \cite{4082128}, cunoscut pentru optimalitatea și eficiența sa în spații de căutare cu euristici admisibile.
+
+\subsection{Determinarea Punctelor de Start și de Sfârșit}
+
+\par Punctul de start este identificat în zona inferioară a măștii solului, în apropierea centrului orizontal al imaginii, simulând poziția picioarelor utilizatorului în cadrul video. Algoritmul scanează rândurile de jos în sus și, pentru fiecare rând, caută cel mai apropiat pixel de sol față de coloana centrală, extinzând progresiv căutarea spre margini. Punctul de sfârșit este determinat simetric, prin scanare de sus în jos, reprezentând cel mai îndepărtat punct practicabil vizibil în direcția de mers.
+
+\par Această convenție — start în partea de jos, țintă în partea de sus a imaginii — reflectă direct geometria perspectivei unei camere montate frontal: pixelii din partea inferioară a imaginii corespund suprafețelor apropiate, iar cei din partea superioară corespund zonelor mai îndepărtate.
+
+\subsection{Algoritmul A* cu Conectivitate 8-Direcțională}
+
+\par Graful de căutare este definit implicit de masca solului: fiecare pixel marcat ca sol reprezintă un nod, iar muchiile conectează fiecare pixel cu cei opt vecini ai săi (conectivitate 8-direcțională). Costul unui pas orizontal sau vertical este $1{,}0$, iar costul unui pas diagonal este $\sqrt{2} \approx 1{,}4142$, reflectând distanța euclidiană reală dintre pixeli adiacenți.
+
+\par Funcția euristică utilizată este distanța octilică (\textit{octile distance}), care constituie o euristică admisibilă pentru conectivitatea 8-direcțională:
+
+\begin{equation}
+    h(n, g) = \max(\Delta r, \Delta c) + (\sqrt{2} - 1) \cdot \min(\Delta r, \Delta c)
+\end{equation}
+
+\noindent unde $\Delta r = |r_n - r_g|$ și $\Delta c = |c_n - c_g|$ sunt diferențele de rând și coloană dintre nodul curent $n$ și nodul țintă $g$. Admisibilitatea euristicii garantează că A* returnează întotdeauna drumul de cost minim \cite{4082128}.
+
+\par Algoritmul menține o coadă de priorități (\textit{min-heap}) ordonată după scorul $f = g + h$, unde $g$ reprezintă costul acumulat de la start, și o matrice $g\_score$ de dimensiunea imaginii pentru stocarea celui mai bun cost cunoscut pentru fiecare nod. La finalizare, drumul este reconstruit prin urmărirea înapoi a structurii \texttt{came\_from} de la nodul țintă până la cel de start.
+
+\par Dacă nu există nicio cale continuă de pixeli de sol între punctul de start și cel de sfârșit — situație posibilă când un obstacol blochează complet trecerea — algoritmul returnează un drum vid, iar sistemul poate semnaliza utilizatorul în consecință.

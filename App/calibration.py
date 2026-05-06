@@ -79,8 +79,7 @@ def _run_calibration(
                 real_world_points, image_points, gray.shape[::-1], None, None
             )
             print(f"RMS: {rms:.4f}" + ("  — consider recalibrating." if rms > 1.0 else ""))
-            np.savez(out_path, camera_matrix=cam_mtx,
-                     distortion_coefficients=dist_coeffs, rms=np.float32(rms))
+            np.savez(out_path, camera_matrix=cam_mtx, distortion_coefficients=dist_coeffs, rms=np.float32(rms))
             print(f"Saved to '{out_path}'.")
             break
 
