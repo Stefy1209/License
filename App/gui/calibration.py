@@ -11,7 +11,7 @@ from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtGui import QImage, QPixmap, QPainter, QColor
 
 from gui.components import NavBar, StyledButton, StatusBadge
-from gui.styles import SUCCESS, WARNING, DANGER, TEXT_DIM, BG_DEEP, BG_PANEL, BG_BORDER, TEXT_MAIN
+from gui.styles import SUCCESS, WARNING, DANGER, BG_DEEP, BG_BORDER
 
 
 def _rms_verdict(rms: float) -> tuple[str, str]:
@@ -173,7 +173,7 @@ class _RmsCard(QWidget):
         score_layout.setSpacing(16)
 
         rms_lbl = QLabel(f"RMS reprojection error:  {rms:.4f} px")
-        rms_lbl.setStyleSheet(f"font-size: 15px; font-weight: bold; color: {TEXT_MAIN};")
+        rms_lbl.setStyleSheet("font-size: 15px; font-weight: bold;")
         score_layout.addWidget(rms_lbl)
         score_layout.addStretch()
 
@@ -271,7 +271,6 @@ class _CalibrationDialog(QDialog):
 
         self.setWindowTitle("Camera Calibration")
         self.setMinimumSize(800, 620)
-        self.setStyleSheet(f"background-color: {BG_DEEP};")
 
         self._build()
         self._frame_ready.connect(self._on_frame)
@@ -292,7 +291,6 @@ class _CalibrationDialog(QDialog):
 
         # Result card
         self._result_card = QWidget()
-        self._result_card.setStyleSheet(f"background-color: {BG_PANEL};")
         result_layout = QVBoxLayout(self._result_card)
         result_layout.setContentsMargins(30, 20, 30, 20)
         result_layout.setSpacing(10)
@@ -311,7 +309,7 @@ class _CalibrationDialog(QDialog):
         self._result_tip = QLabel()
         self._result_tip.setObjectName("dim")
         self._result_tip.setWordWrap(True)
-        self._result_tip.setStyleSheet(f"color: {TEXT_DIM}; font-size: 11px;")
+        self._result_tip.setStyleSheet("font-size: 11px;")
         result_layout.addWidget(self._result_tip)
 
         self._result_card.hide()
@@ -319,18 +317,18 @@ class _CalibrationDialog(QDialog):
 
         # Status bar
         bar = QWidget()
-        bar.setStyleSheet(f"background-color: {BG_PANEL}; border-top: 1px solid {BG_BORDER};")
+        bar.setStyleSheet("border-top: 1px solid palette(mid);")
         bar.setFixedHeight(52)
         bar_layout = QHBoxLayout(bar)
         bar_layout.setContentsMargins(20, 0, 20, 0)
         bar_layout.setSpacing(20)
 
         self._progress_lbl = QLabel(f"Captured: 0 / {self._min_frames}")
-        self._progress_lbl.setStyleSheet(f"color: {TEXT_MAIN}; font-size: 13px; font-weight: bold;")
+        self._progress_lbl.setStyleSheet("font-size: 13px; font-weight: bold;")
         bar_layout.addWidget(self._progress_lbl)
 
         self._hint_lbl = QLabel("Move the checkerboard to fill the frame from all angles.")
-        self._hint_lbl.setStyleSheet(f"color: {TEXT_DIM}; font-size: 11px;")
+        self._hint_lbl.setStyleSheet("font-size: 11px;")
         bar_layout.addWidget(self._hint_lbl, stretch=1)
 
         self._action_btn = QPushButton("STOP")
@@ -448,7 +446,7 @@ class _CalibrationDialog(QDialog):
         self._preview.hide()
 
         self._result_title.setText(f"Calibration complete  —  RMS error: {rms:.4f} px")
-        self._result_title.setStyleSheet(f"font-size: 15px; font-weight: bold; color: {TEXT_MAIN};")
+        self._result_title.setStyleSheet("font-size: 15px; font-weight: bold;")
 
         bar = _RmsBar(rms)
         bar.setFixedHeight(22)

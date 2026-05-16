@@ -5,10 +5,7 @@ from PyQt6.QtWidgets import (
     QFrame, QSizePolicy,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QPropertyAnimation, QEasingCurve, pyqtProperty
-from PyQt6.QtGui import QFont, QPainter, QColor
-
-
-from gui.styles import ACCENT, TEXT_MAIN, BG_BORDER, FONT_FAMILY
+from PyQt6.QtGui import QPainter, QPalette
 
 
 class StyledButton(QPushButton):
@@ -78,7 +75,6 @@ class StatusBadge(QLabel):
     def __init__(self, text: str = "", variant: str = "dim", parent: QWidget = None):
         super().__init__(text, parent)
         self.setObjectName(variant)
-        self.setFont(QFont(FONT_FAMILY, 10))
 
     def set_variant(self, variant: str, text: str):
         self.setObjectName(variant)
@@ -135,7 +131,9 @@ class ToggleSwitch(QWidget):
         radius = track_h / 2
 
         # Track
-        track_color = QColor(ACCENT) if self._checked else QColor(BG_BORDER)
+        pal = self.palette()
+        track_color = pal.color(QPalette.ColorRole.Highlight) if self._checked \
+                      else pal.color(QPalette.ColorRole.Mid)
         p.setBrush(track_color)
         p.setPen(Qt.PenStyle.NoPen)
         p.drawRoundedRect(track_x, track_y, track_w, track_h, radius, radius)
@@ -145,12 +143,12 @@ class ToggleSwitch(QWidget):
         travel     = track_w - thumb_d - 4
         thumb_x    = track_x + 2 + int(self._offset * travel)
         thumb_y    = track_y + 2
-        p.setBrush(QColor("#ffffff"))
+        p.setBrush(pal.color(QPalette.ColorRole.BrightText))
         p.drawEllipse(thumb_x, thumb_y, thumb_d, thumb_d)
 
         # Label
         if self._label:
-            p.setPen(QColor(TEXT_MAIN))
+            p.setPen(pal.color(QPalette.ColorRole.WindowText))
             p.setFont(self.font())
             p.drawText(track_w + 10, 0, self.width() - track_w - 10,
                        self.height(), Qt.AlignmentFlag.AlignVCenter, self._label)

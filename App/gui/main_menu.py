@@ -4,7 +4,6 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QFrame
 from PyQt6.QtCore import Qt, pyqtSignal
 
 from gui.components import StyledButton
-from gui.styles import BG_BORDER
 
 
 class MainMenuWidget(QWidget):
@@ -42,7 +41,6 @@ class MainMenuWidget(QWidget):
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.HLine)
         sep.setFixedWidth(380)
-        sep.setStyleSheet(f"color: {BG_BORDER};")
         header_layout.addSpacing(16)
         header_layout.addWidget(sep, alignment=Qt.AlignmentFlag.AlignCenter)
 
