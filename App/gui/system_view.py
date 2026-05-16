@@ -1,13 +1,14 @@
 from __future__ import annotations
 
+import os
 import time
 import threading
 from typing import Optional
 
 import cv2
 import numpy as np
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QSizePolicy
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QSizePolicy, QFileDialog
+from PyQt6.QtCore import Qt, pyqtSignal, QBuffer, QIODevice
 from PyQt6.QtGui import QImage, QPixmap
 
 from gui.components import NavBar, StyledButton, ToggleSwitch
@@ -23,6 +24,7 @@ class SystemViewWidget(QWidget):
 
     back_requested = pyqtSignal()
     _result_signal = pyqtSignal(object)
+    _save_done_signal = pyqtSignal()
 
     _FPS_SMOOTH = 0.2
 
@@ -36,6 +38,7 @@ class SystemViewWidget(QWidget):
         self._last_tick: Optional[float] = None
         self._inference_thread: Optional[threading.Thread] = None
         self._result_signal.connect(self._on_result)
+        self._save_done_signal.connect(self._on_save_done)
         self._build()
 
     def _build(self):
@@ -46,12 +49,16 @@ class SystemViewWidget(QWidget):
         navbar = NavBar("LIVE SYSTEM")
         navbar.back_clicked.connect(self._on_back)
 
+        self._download_btn = StyledButton("DOWNLOAD", variant="warning")
         self._start_btn = StyledButton("START", variant="success")
         self._stop_btn  = StyledButton("STOP", variant="danger")
+        self._download_btn.setFixedWidth(120)
         self._start_btn.setFixedWidth(120)
         self._stop_btn.setFixedWidth(120)
+        self._download_btn.clicked.connect(self._download)
         self._start_btn.clicked.connect(self._start)
         self._stop_btn.clicked.connect(self._stop)
+        navbar.add_right_widget(self._download_btn)
         navbar.add_right_widget(self._start_btn)
         navbar.add_right_widget(self._stop_btn)
 
@@ -134,6 +141,85 @@ class SystemViewWidget(QWidget):
         layout.addWidget(self._placeholder)
 
         return wrapper
+
+
+    def _download(self):
+        """Opens a folder picker then starts a background thread that saves 5 diagnostic frames."""
+        if not self._running or self._last_result is None:
+            return
+        result = self._last_result
+        view_img = self._grab_view_image()
+        save_dir = QFileDialog.getExistingDirectory(self, "Choose the saving folder")
+        if not save_dir:
+            return
+        self._download_btn.setEnabled(False)
+        threading.Thread(
+            target=self._save_frames,
+            args=(result, view_img, save_dir),
+            daemon=True,
+            name="download",
+        ).start()
+
+    def _grab_view_image(self) -> Optional[np.ndarray]:
+        """Returns the current canvas frame as a BGR numpy array (GUI thread only)."""
+        pixmap = self._frame_lbl.pixmap()
+        if pixmap is None or pixmap.isNull():
+            return None
+        buf = QBuffer()
+        buf.open(QIODevice.OpenModeFlag.ReadWrite)
+        pixmap.save(buf, "PNG")
+        raw = bytes(buf.data())
+        if not raw:
+            return None
+        return cv2.imdecode(np.frombuffer(raw, dtype=np.uint8), cv2.IMREAD_COLOR)
+
+    def _on_save_done(self):
+        """Re-enables the download button after the background save completes."""
+        self._download_btn.setEnabled(True)
+
+    def _save_frames(self, result, view_img, save_dir):
+        """Saves 5 diagnostic frames to save_dir; runs entirely in a background thread."""
+        from visualization import visualize_depth
+
+        ts = time.strftime("%Y%m%d_%H%M%S")
+        cfg = self._cfg
+
+        def write(name, img_bgr):
+            cv2.imwrite(os.path.join(save_dir, f"{ts}_{name}.png"), img_bgr)
+
+        # 1 — original camera frame
+        write("1_original", result.rgb_frame)
+
+        if result.depth_map is not None:
+            depth_bgr, _, _ = visualize_depth(result.depth_map)
+
+            # 2 — depth estimation 
+            write("2_depth", depth_bgr)
+
+            depth_rgb = cv2.cvtColor(depth_bgr, cv2.COLOR_BGR2RGB)
+
+            # 3 — depth + plane
+            if result.ground_mask is not None:
+                colour = tuple(reversed(cfg.visualization.ground_colour_bgr))
+                frame3 = _overlay_ground(depth_rgb, result.ground_mask, colour,
+                                         cfg.visualization.ground_overlay_alpha)
+            else:
+                frame3 = depth_rgb
+            write("3_depth_ground", cv2.cvtColor(frame3, cv2.COLOR_RGB2BGR))
+
+            # 4 — depth + plane + path
+            frame4 = frame3.copy()
+            if result.path is not None and len(result.path) >= 2:
+                frame4 = _overlay_path(frame4, result.path, result.start_point, result.end_point)
+            write("4_depth_ground_path", cv2.cvtColor(frame4, cv2.COLOR_RGB2BGR))
+
+        # 5 — live view from the app
+        if view_img is not None:
+            write("5_view", view_img)
+
+        self._save_done_signal.emit()
+
+
 
     def _start(self):
         if self._running:
@@ -237,8 +323,6 @@ class SystemViewWidget(QWidget):
         if show_path and result.path is not None and len(result.path) >= 2:
             frame = _overlay_path(frame, result.path, result.start_point, result.end_point)
 
-        _draw_status_bar(frame, result.plane)
-
         available = self._frame_lbl.size()
         ih, iw = frame.shape[:2]
         aw, ah = available.width(), available.height()
@@ -303,13 +387,3 @@ def _overlay_path(frame, path, start, end):
         cv2.circle(out, (int(end[1]), int(end[0])), 6, (255, 0, 0), -1)
         cv2.circle(out, (int(end[1]), int(end[0])), 6, (0,   0, 0),  1)
     return out
-
-
-def _draw_status_bar(frame, plane):
-    if plane is None:
-        text, colour = "Ground plane: NOT DETECTED", (220, 40, 40)
-    else:
-        a, b, c, d = plane
-        text, colour = f"Ground: [{a:+.2f}, {b:+.2f}, {c:+.2f}, {d:+.2f}]", (40, 220, 80)
-    cv2.rectangle(frame, (0, 0), (frame.shape[1], 22), (20, 20, 20), -1)
-    cv2.putText(frame, text, (6, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, colour, 1, cv2.LINE_AA)
