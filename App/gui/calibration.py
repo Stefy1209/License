@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSizePolicy, QDialog, QPushButton
 from PyQt6.QtCore import pyqtSignal, Qt
-from PyQt6.QtGui import QImage, QPixmap, QPainter, QColor
+from PyQt6.QtGui import QImage, QPixmap, QPainter, QColor, QIcon
 
 from gui.components import NavBar, StyledButton, StatusBadge
 from gui.styles import SUCCESS, WARNING, DANGER, BG_DEEP, BG_BORDER
@@ -42,7 +42,7 @@ class CalibrationWidget(QWidget):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-        self._navbar = NavBar("CAMERA CALIBRATION")
+        self._navbar = NavBar("Camera Calibration")
         self._navbar.back_clicked.connect(self.back_requested)
         root.addWidget(self._navbar)
 
@@ -119,7 +119,7 @@ class CalibrationWidget(QWidget):
         ctrl_layout = QHBoxLayout(ctrl)
         ctrl_layout.setContentsMargins(0, 0, 0, 0)
 
-        launch_btn = StyledButton("START CALIBRATION")
+        launch_btn = StyledButton("Start Calibration")
         launch_btn.setMinimumWidth(220)
         launch_btn.clicked.connect(self._launch)
         ctrl_layout.addWidget(launch_btn)
@@ -331,8 +331,8 @@ class _CalibrationDialog(QDialog):
         self._hint_lbl.setStyleSheet("font-size: 11px;")
         bar_layout.addWidget(self._hint_lbl, stretch=1)
 
-        self._action_btn = QPushButton("STOP")
-        self._action_btn.setObjectName("danger")
+        self._action_btn = QPushButton("Stop")
+        self._action_btn.setIcon(QIcon.fromTheme("media-playback-stop"))
         self._action_btn.setFixedWidth(110)
         self._action_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._action_btn.clicked.connect(self._abort)
@@ -415,10 +415,25 @@ class _CalibrationDialog(QDialog):
                 distortion_coefficients=dist_coeffs,
                 rms=np.float32(rms),
             )
+            self._save_to_library(float(rms))
             self._result_ready.emit(float(rms))
         else:
             if not self._stop_event.is_set():
                 self._aborted.emit()
+
+    def _save_to_library(self, rms: float) -> None:
+        """Auto-saves the calibration to the DB library (non-critical, runs in caller thread)."""
+        try:
+            from persistence import make_service
+            make_service().add_from_calibration(
+                npz_path  = self._out_path,
+                rms       = rms,
+                cols      = self._cols,
+                rows      = self._rows,
+                square_mm = self._square_mm,
+            )
+        except Exception:
+            pass  # non-critical: library save failure must not affect the main calibration flow
 
     def _on_frame(self, frame: np.ndarray, captured: int, total: int):
         self._progress_lbl.setText(f"Captured: {captured} / {total}")
@@ -472,10 +487,8 @@ class _CalibrationDialog(QDialog):
 
         self._progress_lbl.setText(f"Captured: {self._min_frames} / {self._min_frames}")
         self._hint_lbl.setText("Calibration saved.")
-        self._action_btn.setText("CLOSE")
-        self._action_btn.setObjectName("success")
-        self._action_btn.style().unpolish(self._action_btn)
-        self._action_btn.style().polish(self._action_btn)
+        self._action_btn.setText("Close")
+        self._action_btn.setIcon(QIcon.fromTheme("dialog-close"))
         self._action_btn.clicked.disconnect()
         self._action_btn.clicked.connect(self.close)
 

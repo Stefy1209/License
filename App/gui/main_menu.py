@@ -6,13 +6,12 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from gui.components import StyledButton
 
 
-class MainMenuWidget(QWidget):
-    """Landing screen: Calibrate / Run / Settings / Exit."""
-
+class MainMenuWidget(QWidget):  
     calibrate_requested = pyqtSignal()
-    run_requested       = pyqtSignal()
-    settings_requested  = pyqtSignal()
-    exit_requested      = pyqtSignal()
+    calibration_library_requested = pyqtSignal()
+    run_requested = pyqtSignal()
+    settings_requested = pyqtSignal()
+    exit_requested = pyqtSignal()
 
     def __init__(self, config_path: str, hw_profile: str, parent: QWidget = None):
         super().__init__(parent)
@@ -28,7 +27,7 @@ class MainMenuWidget(QWidget):
         header_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_layout.setSpacing(4)
 
-        title = QLabel("DEPTH VISION")
+        title = QLabel("Depth Vision")
         title.setObjectName("title")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_layout.addWidget(title)
@@ -53,16 +52,18 @@ class MainMenuWidget(QWidget):
         btn_layout = QVBoxLayout(btn_col)
         btn_layout.setSpacing(14)
 
-        calibrate_btn = StyledButton("CALIBRATE CAMERA")
-        run_btn       = StyledButton("RUN SYSTEM",  variant="success")
-        settings_btn  = StyledButton("SETTINGS",    variant="warning")
-        exit_btn      = StyledButton("EXIT",        variant="danger")
+        calibrate_btn = StyledButton("Calibrate Camera", icon_name="camera-photo")
+        library_btn = StyledButton("Calibration Library", icon_name="view-list-details")
+        run_btn = StyledButton("Run System", icon_name="media-playback-start")
+        settings_btn = StyledButton("Settings", icon_name="configure")
+        exit_btn = StyledButton("Exit", icon_name="application-exit")
 
-        for btn in (calibrate_btn, run_btn, settings_btn, exit_btn):
+        for btn in (calibrate_btn, library_btn, run_btn, settings_btn, exit_btn):
             btn.setMinimumHeight(48)
             btn_layout.addWidget(btn)
 
         calibrate_btn.clicked.connect(self.calibrate_requested)
+        library_btn.clicked.connect(self.calibration_library_requested)
         run_btn.clicked.connect(self.run_requested)
         settings_btn.clicked.connect(self.settings_requested)
         exit_btn.clicked.connect(self.exit_requested)

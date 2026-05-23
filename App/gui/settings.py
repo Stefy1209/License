@@ -28,7 +28,7 @@ class SettingsWidget(QWidget):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-        navbar = NavBar("SETTINGS")
+        navbar = NavBar("Settings")
         navbar.back_clicked.connect(self.back_requested)
         root.addWidget(navbar)
 
@@ -44,25 +44,25 @@ class SettingsWidget(QWidget):
 
         cfg = self._cfg
 
-        form.addWidget(SectionHeader("HARDWARE"))
+        form.addWidget(SectionHeader("Hardware"))
         self._profile = _DropdownRow(form, "Profile", cfg.hardware.profile, ["nvidia", "rpi"])
         self._depth_mode = _DropdownRow(form, "Depth mode", cfg.hardware.depth_mode, ["metric", "relative"])
 
 
-        form.addWidget(SectionHeader("CAMERA"))
+        form.addWidget(SectionHeader("Camera"))
         self._cam_id = _FieldRow(form, "Camera ID", str(cfg.camera.id), tip="device index")
         self._cam_width = _FieldRow(form, "Width (px)", str(cfg.camera.width))
         self._cam_height = _FieldRow(form, "Height (px)", str(cfg.camera.height))
         self._cam_retries = _FieldRow(form, "Max retries", str(cfg.camera.max_read_retries))
 
-        form.addWidget(SectionHeader("CALIBRATION"))
+        form.addWidget(SectionHeader("Calibration"))
         self._cal_file = _FieldRow(form, "Output file", cfg.calibration.file, tip=".npz path")
         self._cal_cols = _FieldRow(form, "Cols", str(cfg.calibration.cols), tip="inner corners")
         self._cal_rows = _FieldRow(form, "Rows", str(cfg.calibration.rows), tip="inner corners")
         self._cal_square = _FieldRow(form, "Square (mm)", str(cfg.calibration.square_mm))
         self._cal_frames = _FieldRow(form, "Min frames", str(cfg.calibration.min_frames))
 
-        form.addWidget(SectionHeader("GROUND DETECTION"))
+        form.addWidget(SectionHeader("Ground Detection"))
         self._gnd_seed = _FieldRow(form, "Seed region", str(cfg.ground.seed_region), tip="0-1 fraction from bottom")
         self._gnd_iter = _FieldRow(form, "RANSAC iterations", str(cfg.ground.ransac_iterations))
         self._gnd_smooth = _FieldRow(form, "Plane smoothing", str(cfg.ground.plane_smoothing), tip="EMA weight 0-1")
@@ -70,10 +70,10 @@ class SettingsWidget(QWidget):
         self._gnd_thr_m = _FieldRow(form, "Threshold metric", str(cfg.ground.ransac_threshold_metric), tip="metres")
         self._gnd_thr_r = _FieldRow(form, "Threshold relative", str(cfg.ground.ransac_threshold_relative), tip="fraction of range")
 
-        form.addWidget(SectionHeader("MODEL (NVIDIA)"))
+        form.addWidget(SectionHeader("Model (Nvidia)"))
         self._mdl_id = _FieldRow(form, "Model ID", cfg.model.id, tip="HuggingFace model ID")
 
-        form.addWidget(SectionHeader("RPi / HAILO"))
+        form.addWidget(SectionHeader("RPi / Hailo"))
         self._rpi_hef = _FieldRow(form, "HEF path", cfg.rpi.hef_path)
         self._rpi_w = _FieldRow(form, "Model input width", str(cfg.rpi.model_input_width))
         self._rpi_h = _FieldRow(form, "Model input height", str(cfg.rpi.model_input_height))
@@ -88,7 +88,7 @@ class SettingsWidget(QWidget):
         save_layout.addWidget(self._status_lbl)
         save_layout.addStretch()
 
-        save_btn = StyledButton("SAVE SETTINGS", variant="success")
+        save_btn = StyledButton("Save Settings", icon_name="document-save")
         save_btn.setMinimumWidth(200)
         save_btn.clicked.connect(self._save)
         save_layout.addWidget(save_btn)

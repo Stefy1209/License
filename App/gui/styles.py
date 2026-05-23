@@ -42,7 +42,4 @@ QLabel#nav-title { font-size: 14px; font-weight: bold; }
 QLabel#title    { font-size: 36px; font-weight: bold; }
 QLabel#subtitle { font-size: 13px; color: gray; }
 
-QPushButton#success { color: #22c55e; }
-QPushButton#danger  { color: #ef4444; }
-QPushButton#warning { color: #f59e0b; }
 """

@@ -77,7 +77,11 @@ def add_status_bar(image: np.ndarray, plane: Optional[np.ndarray]) -> None:
         text, colour = "Ground plane: NOT DETECTED", (0, 0, 220)
     else:
         a, b, c, d = plane
-        text, colour = f"Ground: [{a:+.2f}, {b:+.2f}, {c:+.2f}, {d:+.2f}]", (0, 220, 80)
+        tilt = np.degrees(np.arccos(min(abs(float(b)), 1.0)))
+        text, colour = (
+            f"Ground: a:{a:+.2f} b:{b:+.2f} c:{c:+.2f} d:{d:+.2f}  |  tilt: {tilt:.1f}°",
+            (0, 220, 80),
+        )
 
     cv2.rectangle(image, (0, 0), (image.shape[1], 22), (20, 20, 20), -1)
     cv2.putText(image, text, (6, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, colour, 1, cv2.LINE_AA)

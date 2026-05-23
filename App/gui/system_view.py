@@ -46,12 +46,12 @@ class SystemViewWidget(QWidget):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-        navbar = NavBar("LIVE SYSTEM")
+        navbar = NavBar("Live System")
         navbar.back_clicked.connect(self._on_back)
 
-        self._download_btn = StyledButton("DOWNLOAD", variant="warning")
-        self._start_btn = StyledButton("START", variant="success")
-        self._stop_btn  = StyledButton("STOP", variant="danger")
+        self._download_btn = StyledButton("Download", icon_name="folder-download")
+        self._start_btn = StyledButton("Start", icon_name="media-playback-start")
+        self._stop_btn  = StyledButton("Stop",  icon_name="media-playback-stop")
         self._download_btn.setFixedWidth(120)
         self._start_btn.setFixedWidth(120)
         self._stop_btn.setFixedWidth(120)
@@ -83,7 +83,7 @@ class SystemViewWidget(QWidget):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(8)
 
-        view_hdr = QLabel("VIEW OPTIONS")
+        view_hdr = QLabel("View Options")
         view_hdr.setObjectName("section")
         layout.addWidget(view_hdr)
 
@@ -106,7 +106,7 @@ class SystemViewWidget(QWidget):
         layout.addWidget(sep2)
         layout.addSpacing(8)
 
-        self._status_lbl = QLabel("IDLE")
+        self._status_lbl = QLabel("Idle")
         self._status_lbl.setObjectName("dim")
         layout.addWidget(self._status_lbl)
 
@@ -134,7 +134,7 @@ class SystemViewWidget(QWidget):
         self._frame_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         layout.addWidget(self._frame_lbl)
 
-        self._placeholder = QLabel("Press  START  to begin")
+        self._placeholder = QLabel("Press  Start  to begin")
         self._placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._placeholder.setObjectName("dim")
         self._placeholder.setStyleSheet("font-size: 16px;")
@@ -228,7 +228,7 @@ class SystemViewWidget(QWidget):
         self._running = True
         self._start_btn.setEnabled(False)
         self._stop_btn.setEnabled(True)
-        self._status_lbl.setText("LOADING...")
+        self._status_lbl.setText("Loading...")
         self._status_lbl.setObjectName("warning")
         self._refresh_label_style(self._status_lbl)
 
@@ -257,7 +257,7 @@ class SystemViewWidget(QWidget):
         self._stop_btn.setEnabled(False)
         self._frame_lbl.clear()
         self._placeholder.show()
-        self._status_lbl.setText("IDLE")
+        self._status_lbl.setText("Idle")
         self._status_lbl.setObjectName("dim")
         self._refresh_label_style(self._status_lbl)
         self._plane_lbl.setText("plane: —")
@@ -337,13 +337,16 @@ class SystemViewWidget(QWidget):
         self._frame_lbl.setPixmap(QPixmap.fromImage(qt_image))
 
     def _update_sidebar(self, result):
-        self._status_lbl.setText("RUNNING")
+        self._status_lbl.setText("Running")
         self._status_lbl.setObjectName("success")
         self._refresh_label_style(self._status_lbl)
 
         if result.plane is not None:
             a, b, c, d = result.plane
-            self._plane_lbl.setText(f"plane:\n[{a:+.2f}, {b:+.2f},\n {c:+.2f}, {d:+.2f}]")
+            tilt = np.degrees(np.arccos(min(abs(float(b)), 1.0)))
+            self._plane_lbl.setText(
+                f"plane:\na:{a:+.2f}  b:{b:+.2f}\nc:{c:+.2f}  d:{d:+.2f}\ntilt: {tilt:.1f}°"
+            )
             self._plane_lbl.setObjectName("success")
         else:
             self._plane_lbl.setText("plane: —")

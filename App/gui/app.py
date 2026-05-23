@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import QMainWindow, QStackedWidget, QApplication
 from gui.styles import GLOBAL_STYLESHEET
 from gui.main_menu import MainMenuWidget
 from gui.calibration import CalibrationWidget
+from gui.calibration_manager import CalibrationManagerWidget
 from gui.settings import SettingsWidget
 from gui.system_view import SystemViewWidget
 
@@ -23,7 +24,7 @@ class MainWindow(QMainWindow):
         self._cfg         = cfg
         self._config_path = config_path
 
-        self.setWindowTitle("DEPTH VISION")
+        self.setWindowTitle("Depth Vision")
         self.resize(1280, 800)
         self.setMinimumSize(900, 600)
 
@@ -50,6 +51,7 @@ class MainWindow(QMainWindow):
     def _show_main(self):
         w = MainMenuWidget(self._config_path, self._cfg.hardware.profile)
         w.calibrate_requested.connect(self._show_calibration)
+        w.calibration_library_requested.connect(self._show_calibration_manager)
         w.run_requested.connect(self._show_system)
         w.settings_requested.connect(self._show_settings)
         w.exit_requested.connect(self.close)
@@ -57,6 +59,11 @@ class MainWindow(QMainWindow):
 
     def _show_calibration(self):
         w = CalibrationWidget(self._cfg)
+        w.back_requested.connect(self._show_main)
+        self._push(w)
+
+    def _show_calibration_manager(self):
+        w = CalibrationManagerWidget(self._cfg)
         w.back_requested.connect(self._show_main)
         self._push(w)
 
@@ -85,6 +92,8 @@ class MainWindow(QMainWindow):
 def run(config_path: str = "config.toml") -> None:
     """Create the QApplication, apply the stylesheet, and launch the window."""
     from config import AppConfig
+    from persistence import init_db
+    init_db()
 
     app = QApplication(sys.argv)
     app.setStyleSheet(GLOBAL_STYLESHEET)

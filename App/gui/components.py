@@ -5,14 +5,16 @@ from PyQt6.QtWidgets import (
     QFrame, QSizePolicy,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QPropertyAnimation, QEasingCurve, pyqtProperty
-from PyQt6.QtGui import QPainter, QPalette
+from PyQt6.QtGui import QPainter, QPalette, QIcon
 
 
 class StyledButton(QPushButton):
-    """Outlined button. Pass variant='success'|'danger'|'warning' for alternate colors."""
+    """Outlined button with optional system icon. Pass icon_name for a themed icon."""
 
-    def __init__(self, text: str, variant: str = "accent", parent: QWidget = None):
+    def __init__(self, text: str, variant: str = "accent", icon_name: str = "", parent: QWidget = None):
         super().__init__(text, parent)
+        if icon_name:
+            self.setIcon(QIcon.fromTheme(icon_name))
         if variant != "accent":
             self.setObjectName(variant)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -32,7 +34,7 @@ class NavBar(QWidget):
         layout.setContentsMargins(16, 0, 16, 0)
         layout.setSpacing(12)
 
-        self._back_btn = StyledButton("BACK")
+        self._back_btn = StyledButton("Back", icon_name="go-previous")
         self._back_btn.setFixedWidth(110)
         self._back_btn.clicked.connect(self.back_clicked)
         layout.addWidget(self._back_btn)
