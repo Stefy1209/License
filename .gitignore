@@ -554,3 +554,9 @@ App/depth_map.npy
 # Ground mask used to save the ground plane
 App/ground_mask.npy
 .directory
+
+# Calibration files used by the system. Each system should use its own files
+App/calibration_files
+
+# SQLite database generated at runtime — machine-specific calibration data
+App/calibrations.db
