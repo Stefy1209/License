@@ -7,21 +7,51 @@ Aplicația este structurată ca un sistem modular de procesare video în timp re
 
 Întreaga bază de cod este scrisă în Python 3.11+ și organizată în două mari componente: un \textbf{backend} de procesare și o \textbf{interfață grafică} (GUI) construită cu PyQt6. Separarea clară dintre aceste două componente permite înlocuirea sau testarea fiecăreia independent.
 
-\section{Principii de Proiectare Utilizate}
+\section{Tehnologii Utilizate}
+
+Implementarea sistemului se bazează pe un set de biblioteci și framework-uri specializate, selectate în funcție de cerințele de performanță și de compatibilitatea cu cele două platforme hardware vizate. Tabelul~\ref{tab:tech} prezintă o sinteză a acestora, împreună cu versiunea utilizată și rolul fiecăreia în arhitectura aplicației.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{|l|l|p{7cm}|}
+\hline
+\textbf{Tehnologie} & \textbf{Versiune} & \textbf{Rol în aplicație} \\
+\hline
+Python & 3.11+ & Limbajul principal; utilizat pentru întreaga bază de cod, beneficiind de \texttt{dataclasses}, type hints și \texttt{tomllib} nativ \\
+\hline
+PyQt6 & 6.x & Interfața grafică multi-platformă; mecanismul de semnale și sloturi asigură comunicarea thread-safe între fire de execuție \\
+\hline
+OpenCV & 4.x & Captură video (V4L2), corecție de distorsiune, calibrare cu tablă de șah \\
+\hline
+NumPy & 2.x & Procesare numerică vectorizată a hărților de adâncime, măștilor și coordonatelor 3D \\
+\hline
+PyTorch + CUDA & 2.x & Backend de inferență pe GPU NVIDIA; suportă AMP și \texttt{torch.compile} \\
+\hline
+Hailo Runtime & 4.x & Backend de inferență pe NPU Hailo-8 integrat în Raspberry Pi AI HAT+ \\
+\hline
+TOML & — & Format de configurație structurată, citit nativ via \texttt{tomllib} (Python 3.11+) \\
+\hline
+\end{tabular}
+\caption{Tehnologiile principale utilizate în implementare}
+\label{tab:tech}
+\end{table}
+
+\section{Principii de Proiectare Orientată pe Obiecte}
 
 \subsection{Separarea Responsabilităților}
 
 Fiecare modul al aplicației are o singură responsabilitate bine definită. Modulul \texttt{config.py} se ocupă exclusiv de citirea și validarea configurației. Modulul \texttt{hardware.py} abstractizează diferențele dintre platformele hardware. Modulul \texttt{ground.py} conține exclusiv logica de detectare a planului solului, fără nicio referință la interfața grafică sau la camera video. Această separare face ca fiecare componentă să poată fi testată, înlocuită sau extinsă fără a afecta restul sistemului.
 
-\subsection{Programare Orientată pe Obiecte}
+\subsection{Încapsulare și Gestiunea Stării}
 
-Clasele sunt folosite acolo unde există stare internă care trebuie gestionată pe durata vieții unui obiect. \texttt{HardwareProfile} encapsulează profilul hardware activ și expune proprietăți derivate (\texttt{is\_nvidia}, \texttt{is\_rpi}, \texttt{is\_metric}) fără a expune câmpurile interne. \texttt{CalibrationService} grupează operațiile de calibrare împreună cu configurația de care au nevoie. \texttt{DepthPipeline} gestionează întregul ciclu de viață al procesării unui cadru video: deschiderea camerei, încărcarea modelului, firul de captură, și eliberarea resurselor la oprire. \texttt{ModelRegistry} abstractizează alegerea backend-ului de inferență, astfel că apelantul nu știe și nu trebuie să știe dacă inferența rulează pe CUDA sau pe NPU Hailo.
+Clasele sunt folosite acolo unde există stare internă care trebuie gestionată pe durata vieții unui obiect. \texttt{HardwareProfile} encapsulează profilul hardware activ și expune proprietăți derivate (\texttt{is\_nvidia}, \texttt{is\_rpi}, \texttt{is\_metric}) fără a expune câmpurile interne. \texttt{CalibrationService} grupează operațiile de calibrare împreună cu configurația de care au nevoie. \texttt{DepthPipeline} gestionează întregul ciclu de viață al procesării unui cadru video: deschiderea camerei, încărcarea modelului, firul de captură, și eliberarea resurselor la oprire.
 
 Funcțiile pure sunt preferate claselor atunci când nu există stare internă de gestionat. Modulele \texttt{ground.py}, \texttt{path.py} și \texttt{visualization.py} sunt compuse exclusiv din funcții, deoarece transformările pe care le realizează (proiecție 3D, RANSAC, A*, suprapunere vizuală) sunt fără efecte secundare și nu necesită obiecte.
 
-\subsection{Configurație Tipizată}
+\subsection{Configurație Tipizată prin Dataclasses}
 
-Configurația aplicației este citită o singură dată la pornire din fișierul \texttt{config.toml} și transformată într-un arbore de \texttt{dataclass}-uri imutabile (\texttt{frozen=True}): \texttt{AppConfig}, \texttt{CameraConfig}, \texttt{CalibrationConfig}, \texttt{GroundConfig} etc. Această abordare elimină accesul prin chei de tip șir de caractere (de exemplu \texttt{cfg["ground"]["seed\_region"]}) și înlocuiește șirul de caractere cu atribute tipizate (\texttt{cfg.ground.seed\_region}), ceea ce permite detectarea erorilor de configurare la încărcare, nu la rulare, și oferă autocompletare în mediile de dezvoltare.
+Configurația aplicației este citită o singură dată la pornire din fișierul \texttt{config.toml} și transformată într-un arbore de \texttt{dataclass}-uri imutabile (\texttt{frozen=True}): \texttt{AppConfig}, \texttt{CameraConfig}, \texttt{CalibrationConfig}, \texttt{GroundConfig} etc. Această abordare elimină accesul prin chei de tip șir de caractere și înlocuiește șirul de caractere cu atribute tipizate, ceea ce permite detectarea erorilor de configurare la încărcare, nu la rulare, și oferă autocompletare în mediile de dezvoltare.
 
 \subsection{Comunicare Asincronă prin Semnale Qt}
 
@@ -29,7 +59,123 @@ Inferența modelului de adâncime și captura video rulează în fire de execuț
 
 \subsection{Inversiunea Dependențelor la Nivel de Backend}
 
-Modulul \texttt{model.py} acționează ca un registru de factory: în funcție de profilul hardware activ, deleghează apelurile fie către \texttt{model\_nvidia.py}, fie către \texttt{model\_rpi.py}. Pipeline-ul central (\texttt{pipeline.py}) depinde exclusiv de interfața abstractă a lui \texttt{ModelRegistry}, nu de implementările concrete. Adăugarea unui nou backend (de exemplu un alt accelerator hardware) necesită doar adăugarea unui fișier nou și a unui caz în registru, fără a modifica pipeline-ul sau GUI-ul.
+Modulul \texttt{model.py} acționează ca un registru de factory: în funcție de profilul hardware activ, deleghează apelurile fie către \texttt{model\_nvidia.py}, fie către \texttt{model\_rpi.py}. Pipeline-ul central (\texttt{pipeline.py}) depinde exclusiv de interfața abstractă a lui \texttt{ModelRegistry}, nu de implementările concrete. Adăugarea unui nou backend necesită doar adăugarea unui fișier nou și a unui caz în registru, fără a modifica pipeline-ul sau GUI-ul.
+
+\section{Diagrama de Clase}
+
+Figura~\ref{fig:classdiagram} prezintă clasele principale ale aplicației și relațiile dintre acestea. Săgețile continue indică asocieri de utilizare, iar săgețile întrerupte indică dependențe sau relații de creare.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    >=Stealth,
+    assoc/.style={->, thick},
+    dep/.style={->, dashed, thick},
+    every node/.style={font=\scriptsize}
+]
+
+\tikzset{
+    umlclass/.style={
+        rectangle split, rectangle split parts=3,
+        draw, fill=blue!6,
+        rectangle split part align={center, left, left},
+        inner sep=3pt, minimum width=4cm, text width=3.8cm
+    },
+    umldto/.style={
+        rectangle split, rectangle split parts=2,
+        draw, fill=orange!8,
+        rectangle split part align={center, left},
+        inner sep=3pt, minimum width=4cm, text width=3.8cm
+    }
+}
+
+% Row 1
+\node[umlclass] (CalibSvc) at (0, 9) {
+    \textbf{CalibrationService}
+    \nodepart{two}
+    \texttt{-cfg: AppConfig}
+    \nodepart{three}
+    \texttt{+load(): (mtx, dist)}\\
+    \texttt{+run\_interactive()}
+};
+
+\node[umlclass] (AppConfig) at (5.5, 9) {
+    \textbf{AppConfig}
+    \nodepart{two}
+    \texttt{+hardware: HardwareConfig}\\
+    \texttt{+camera: CameraConfig}\\
+    \texttt{+ground: GroundConfig}
+    \nodepart{three}
+    \texttt{+load(path): AppConfig}
+};
+
+\node[umlclass] (HwProfile) at (11, 9) {
+    \textbf{HardwareProfile}
+    \nodepart{two}
+    \texttt{+profile: str}\\
+    \texttt{+is\_nvidia: bool}\\
+    \texttt{+is\_rpi: bool}
+    \nodepart{three}
+    \texttt{+torch\_device(): str}\\
+    \texttt{+from\_config(cfg)}
+};
+
+% Row 2
+\node[umlclass] (MainWindow) at (0, 4.5) {
+    \textbf{MainWindow}
+    \nodepart{two}
+    \texttt{-pipeline: DepthPipeline}\\
+    \texttt{-cfg: AppConfig}
+    \nodepart{three}
+    \texttt{+start\_pipeline()}\\
+    \texttt{+stop\_pipeline()}
+};
+
+\node[umlclass] (Pipeline) at (5.5, 4.5) {
+    \textbf{DepthPipeline}
+    \nodepart{two}
+    \texttt{-cfg: AppConfig}\\
+    \texttt{-hw: HardwareProfile}\\
+    \texttt{-model: ModelRegistry}
+    \nodepart{three}
+    \texttt{+start\_capture()}\\
+    \texttt{+process\_next\_frame()}\\
+    \texttt{+stop()}
+};
+
+\node[umlclass] (ModelReg) at (11, 4.5) {
+    \textbf{ModelRegistry}
+    \nodepart{two}
+    \texttt{-hw: HardwareProfile}\\
+    \texttt{-model: Any}
+    \nodepart{three}
+    \texttt{+estimate\_depth(}\\
+    \texttt{\ \ frame, intrinsics)}
+};
+
+% Row 3
+\node[umldto] (FrameResult) at (5.5, 0.5) {
+    \textbf{FrameResult}
+    \nodepart{two}
+    \texttt{+rgb\_frame: ndarray}\\
+    \texttt{+depth\_map: ndarray}\\
+    \texttt{+ground\_mask: ndarray}\\
+    \texttt{+path: ndarray}\\
+    \texttt{+plane: ndarray}
+};
+
+% Relationships
+\draw[dep]  (CalibSvc.east)      -- node[above]{\textit{uses}} (AppConfig.west);
+\draw[dep]  (MainWindow.east)    -- node[above]{\textit{uses}} (Pipeline.west);
+\draw[assoc](Pipeline.north)     -- node[right]{\textit{uses}} (AppConfig.south);
+\draw[assoc](Pipeline.east)      -- node[above]{\textit{uses}} (ModelReg.west);
+\draw[assoc](ModelReg.north)     -- node[right]{\textit{uses}} (HwProfile.south);
+\draw[dep]  (Pipeline.south)     -- node[right]{\textit{creates}} (FrameResult.north);
+
+\end{tikzpicture}
+\caption{Diagrama de clase UML a componentelor principale ale aplicației.}
+\label{fig:classdiagram}
+\end{figure}
 
 \section{Arhitectura pe Straturi}
 
@@ -86,6 +232,8 @@ Conține modulele care nu realizează procesare propriu-zisă, ci furnizează co
 
 \section{Diagrama Straturilor}
 
+Figura~\ref{fig:layers} ilustrează sintetic cei patru straturi ai arhitecturii și direcția unică a dependențelor, de la interfața grafică până la infrastructură.
+
 \begin{figure}[htbp]
 \centering
 \begin{tikzpicture}[
@@ -111,10 +259,93 @@ Conține modulele care nu realizează procesare propriu-zisă, ci furnizează co
 \label{fig:layers}
 \end{figure}
 
+\section{Diagrama de Secvență}
+
+Figura~\ref{fig:seqdiagram} ilustrează interacțiunea dintre componente pentru scenariul central al aplicației: pornirea sistemului de către utilizator și procesarea continuă a cadrelor video până la oprire.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[>=Stealth, font=\scriptsize]
+
+% ── Participant boxes ──────────────────────────────────────────────────
+\node[draw, fill=gray!20, minimum width=2.8cm, minimum height=0.65cm]
+    (GUI)      at (1.8, 0)  {\textbf{SystemViewWidget}};
+\node[draw, fill=gray!20, minimum width=2.8cm, minimum height=0.65cm]
+    (PL)       at (6.5, 0)  {\textbf{DepthPipeline}};
+\node[draw, fill=gray!20, minimum width=2.8cm, minimum height=0.65cm]
+    (PROC)     at (11.2, 0) {\textbf{ModelRegistry + Core}};
+
+% ── Lifelines ─────────────────────────────────────────────────────────
+\draw[dashed, gray!60] (1.8,  -0.33) -- (1.8,  -13.5);
+\draw[dashed, gray!60] (6.5,  -0.33) -- (6.5,  -13.5);
+\draw[dashed, gray!60] (11.2, -0.33) -- (11.2, -13.5);
+
+% ── Activation boxes ──────────────────────────────────────────────────
+\fill[white] (6.3, -0.9) rectangle (6.7, -12.2);
+\draw        (6.3, -0.9) rectangle (6.7, -12.2);
+\fill[white] (11.0, -2.7) rectangle (11.4, -3.4);
+\draw        (11.0, -2.7) rectangle (11.4, -3.4);
+\fill[white] (11.0, -5.0) rectangle (11.4, -9.5);
+\draw        (11.0, -5.0) rectangle (11.4, -9.5);
+
+% ── Initialization ────────────────────────────────────────────────────
+\draw[->] (1.8,  -0.9) -- node[above]{\texttt{start()}} (6.3, -0.9);
+\draw[->] (6.7,  -1.7) -- node[above]{\texttt{load\_calibration()}} (11.0, -1.7);
+\draw[->, dashed] (11.0, -2.1) -- node[above]{calibration data} (6.7, -2.1);
+\draw[->] (6.7,  -2.7) -- node[above]{\texttt{load\_model()}} (11.0, -2.7);
+\draw[->, dashed] (11.0, -3.4) -- node[above]{model ready} (6.7, -3.4);
+
+% ── Loop box ──────────────────────────────────────────────────────────
+\draw[thick] (0.2, -4.2) rectangle (12.8, -10.5);
+\node[anchor=north west, font=\scriptsize\itshape] at (0.2, -4.2) {loop [fiecare cadru]};
+
+% ── Per-frame messages ────────────────────────────────────────────────
+\draw[->] (6.7,  -5.0) -- node[above]{\texttt{estimate\_depth(frame)}} (11.0, -5.0);
+\draw[->, dashed] (11.0, -6.0) -- node[above]{\texttt{depth\_map}} (6.7, -6.0);
+\draw[->] (6.7,  -7.0) -- node[above]{\texttt{detect\_ground\_mask(depth\_map)}} (11.0, -7.0);
+\draw[->, dashed] (11.0, -8.0) -- node[above]{\texttt{ground\_mask}} (6.7, -8.0);
+\draw[->] (6.7,  -9.0) -- node[above]{\texttt{find\_path(ground\_mask)}} (11.0, -9.0);
+\draw[->, dashed] (11.0, -9.5) -- node[above]{\texttt{FrameResult}} (6.7, -9.5);
+
+% ── Qt signal to GUI ──────────────────────────────────────────────────
+\draw[->, decorate, decoration={snake, amplitude=1pt, segment length=5pt}]
+    (6.3, -10.8) -- node[above]{\texttt{result\_signal(FrameResult)}} (1.8, -10.8);
+
+% ── Stop ──────────────────────────────────────────────────────────────
+\draw[->] (1.8, -12.2) -- node[above]{\texttt{stop()}} (6.3, -12.2);
+
+% ── Lifeline terminators ──────────────────────────────────────────────
+\draw[thick] (1.6,-13.5) -- (2.0,-13.5);
+\draw[thick] (6.3,-13.5) -- (6.7,-13.5);
+\draw[thick] (11.0,-13.5) -- (11.4,-13.5);
+
+\end{tikzpicture}
+\caption{Diagrama de secvență pentru inițializare și procesarea continuă a cadrelor video. Săgeata ondulată reprezintă semnalul Qt asincron emis către GUI.}
+\label{fig:seqdiagram}
+\end{figure}
+
+\section{Gestiunea Fișierelor de Calibrare (CRUD)}
+
+Aplicația include un subsistem dedicat stocării și gestionării calibrărilor produse în urma sesiunilor de calibrare. Arhitectura acestuia urmează modelul clasic pe trei niveluri: domeniu, repository și serviciu.
+
+\textbf{Modelul de date.} Entitatea centrală este \texttt{CalibrationRecord}, un dataclass pur Python fără dependențe ORM sau NumPy, care conține metadatele unei calibrări: scorul RMS, dimensiunile grilei (\texttt{cols}, \texttt{rows}), dimensiunea pătratului în milimetri, un nume și note opționale, data creării și calea către fișierul \texttt{.npz} asociat. Persistența se realizează printr-o bază de date SQLite (\texttt{calibrations.db}), gestionată prin SQLAlchemy, iar fișierele \texttt{.npz} sunt stocate fizic în directorul \texttt{calibration\_files/} sub un nume UUID unic generat la salvare.
+
+\textbf{Nivelul de acces la date.} Clasa \texttt{CalibrationRepository} implementează operațiile de bază asupra bazei de date: \texttt{save()} pentru inserarea unui record nou, \texttt{find\_by\_id()} și \texttt{find\_all()} pentru interogare, \texttt{update()} pentru modificarea metadatelor și \texttt{delete()} pentru ștergerea unui rând. Conversia între obiectul de domeniu și modelul ORM este realizată prin metodele statice \texttt{\_to\_model()} și \texttt{\_to\_domain()}, menținând astfel o separare strictă între straturile de persistență și logica aplicației.
+
+\textbf{Nivelul de serviciu.} \texttt{CalibrationLibraryService} expune operațiile CRUD complete cu validare integrată:
+\begin{itemize}
+    \item \textbf{Create} — \texttt{add\_from\_calibration()} copiază automat fișierul \texttt{.npz} produs de o sesiune de calibrare în directorul gestionat și salvează metadatele în baza de date; \texttt{import\_file()} permite importul unui fișier extern ales de utilizator, extragând RMS-ul și parametrii grilei direct din fișier dacă sunt disponibili;
+    \item \textbf{Read} — \texttt{list\_all()} returnează toate calibrările ordonate descrescător după dată; \texttt{apply()} copiază fișierul \texttt{.npz} al unei calibrări selectate în locația așteptată de pipeline (\texttt{calibration.npz}), activând-o; \texttt{export()} permite salvarea fișierului într-o destinație aleasă de utilizator;
+    \item \textbf{Update} — \texttt{update\_metadata()} permite editarea numelui și a notelor asociate unei înregistrări, cu validare de lungime și conținut;
+    \item \textbf{Delete} — \texttt{delete()} șterge atât înregistrarea din baza de date, cât și fișierul \texttt{.npz} de pe disc, asigurând consistența între cele două spații de stocare.
+\end{itemize}
+
+Validarea este delegată clasei \texttt{CalibrationValidator}, care verifică RMS-ul, integritatea fișierului \texttt{.npz} și lungimea câmpurilor text înainte de orice operație de scriere.
+
 \section{Fluxul de Date}
 
 La pornirea sistemului, \texttt{MainWindow} încarcă configurația tipizată din \texttt{config.toml} printr-un apel la \texttt{AppConfig.load()}. Când utilizatorul apasă butonul \textit{START} din ecranul de vizualizare live, \texttt{SystemViewWidget} instanțiază un \texttt{DepthPipeline} și pornește firul de inferență. Acesta inițializează \texttt{ModelRegistry} (care, în funcție de profilul hardware, încarcă fie modelul PyTorch, fie fișierul HEF pentru Hailo), deschide camera prin \texttt{CameraFactory} și pornește firul de captură.
 
-La fiecare cadru disponibil, pipeline-ul aplică corecția de distorsiune, rulează inferența pentru a obține harta de adâncime, detectează planul solului prin RANSAC vectorizat și construiește masca, planifică traiectoria prin A*, și împachetează toate rezultatele într-un obiect \texttt{FrameResult}. Acesta este transmis stratului de prezentare prin semnalul Qt \texttt{\_result\_signal}, unde \texttt{SystemViewWidget} aplică suprapunerile vizuale și actualizează widget-ul de afișare.
+La fiecare cadru disponibil, pipeline-ul aplică corecția de distorsiune, rulează inferența pentru a obține harta de adâncime, detectează planul solului prin RANSAC vectorizat și construiește masca, planifică traiectoria prin A*, și împachetează toate rezultatele într-un obiect \texttt{FrameResult}. Acesta este transmis stratului de prezentare prin semnalul Qt \texttt{result\_signal}, unde \texttt{SystemViewWidget} aplică suprapunerile vizuale și actualizează widget-ul de afișare.
 
 Utilizatorul poate modifica parametrii sistemului în orice moment prin ecranul \textit{Settings}, care scrie valorile actualizate înapoi în \texttt{config.toml} și semnalizează ferestrei principale să reîncarce configurația. Modificările intră în vigoare la următoarea pornire a pipeline-ului.

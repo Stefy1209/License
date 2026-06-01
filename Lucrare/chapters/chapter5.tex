@@ -1,4 +1,26 @@
-\chapter{Imbunătățiri}
+\chapter{Rezultate}
 \label{chap:ch5}
 
-\par imbunatatiri
+Dat fiind faptul că nu există teste specifice care să incorporeze în totalitate un asemenea sistem, vom testa fiecare componentă individual, și vom discuta situațiile în care acestea excelează, dar și situații în care apar probleme. La final vom discuta despre aportul fiecărei componente asupra latenței și despre aceasta în general, în funcție de sistem. Se vor face și comparații între sistemul ce folosește placa grafică dedicată NVIDIA, și acceleratorul HAILO-8.
+
+\section{Calibrarea Camerei}
+\label{sec:ch5sec1}
+
+Rezultatele din urma calibrării sunt calculate în funcție de metrica „RMS reprojection error” și sunt puternic influențate de modul în care utilizatorul mișcă modelul de tablă se șah în cadru, și unghiul la care acest este expus. Un scor mai mic reprezintă o calibrare mai performantă, și invers, un scor mare reprezintă o calibrare defectuoasă. Cu cât cadrele sunt capturate în poziții și unghiuri cât mai diverse, cu atât rezultatele vor fi mai bune. Sistemul recomandă captarea a minim 20 de cadre, însă utilizatorul are libertatea de a seta manual, din secțiunea de setări, numărul de cadre ce vor fi captate.
+
+În această secțiunea vom utiliza un grid de 6x9, cu lungimea laturii unui pătrat de 18 milimetrii, și 20 de cadre auto-capturate. Vom testa un scenariu în care calibrarea se va face
+
+\section{Aproximarea Adâncimii}
+\label{sec:ch5sec2}
+
+\section{Detecția Planului}
+\label{sec:ch5sec3}
+
+\section{Determinarea Drumului de Cost Minim}
+\label{sec:ch5sec4}
+
+\section{Latență}
+\label{sec:ch5sec5}
+
+\section{Lumină Abundentă vs. Redusă}
+\label{sec:ch5sec6}

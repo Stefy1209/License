@@ -12,7 +12,7 @@
 \usepackage{tikz}
 \usepackage{amsmath}
 \usepackage{amssymb}
-\usetikzlibrary{shapes.geometric, arrows.meta, positioning, shadow}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, shadow, shapes.multipart, decorations.pathmorphing}
 
 % Definirea stilurilor de blocuri
 \tikzset{
@@ -84,6 +84,7 @@ prefix=std@
 
 \DeclareRobustCommand*{\specialization}[1]{\gdef\@specialization{#1}}   % define command for specialization
 \DeclareRobustCommand*{\supervisor}[1]{\gdef\@supervisor{#1}}           % define command for scientific advisor
+\DeclareRobustCommand*{\titleeng}[1]{\gdef\@titleeng{#1}}              % define command for english title
 
 \ifbool{@eng}{\usepackage[english]{babel}}{\usepackage[romanian]{babel}}
 
@@ -136,6 +137,57 @@ SPECIALIZAREA  \@specialization \\
 \begin{flushright}
 {\Large\textit{
 \ifbool{@eng}{Author}{Absolvent}\\ \@author
+}}
+\end{flushright}
+
+\vfill
+
+\begin{center}
+{\Large{\the\year}}
+\end{center}
+
+\end{titlepage}
+}
+
+\newcommand{\maketitleeng}{
+\begin{titlepage}
+
+\begin{center}
+{\Large\textbf{
+BABEŞ-BOLYAI UNIVERSITY CLUJ-NAPOCA \\
+FACULTY OF MATHEMATICS AND COMPUTER SCIENCE \\
+SPECIALIZATION \@specialization \\
+}}
+\end{center}
+
+\vspace{10em}
+
+\begin{center}
+{\Huge\textbf{
+\ifbool{@dis}{DISSERTATION THESIS}{}
+\ifbool{@lic}{DIPLOMA THESIS}{}
+}}
+\end{center}
+
+\vspace{3em}
+
+\begin{center}
+{\huge\textbf{\@titleeng}}
+\end{center}
+
+\vspace{10em}
+
+\begin{flushleft}
+{\Large\textbf{
+Supervisor \\ \@supervisor
+}}
+\end{flushleft}
+
+\vspace{3em}
+
+\begin{flushright}
+{\Large\textit{
+Author \\ \@author
 }}
 \end{flushright}
 
