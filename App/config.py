@@ -51,6 +51,12 @@ class GroundConfig:
 
 
 @dataclass(frozen=True)
+class ProfilingConfig:
+    enabled: bool
+    output_dir: str
+
+
+@dataclass(frozen=True)
 class VisualizationConfig:
     window_title: str
     ground_overlay_alpha: float
@@ -74,6 +80,7 @@ class AppConfig:
     depth: DepthConfig
     ground: GroundConfig
     visualization: VisualizationConfig
+    profiling: ProfilingConfig
 
     @staticmethod
     def load(path: str = "config.toml") -> "AppConfig":
@@ -87,6 +94,7 @@ class AppConfig:
         dep = raw.get("depth", {})
         gnd = raw.get("ground", {})
         vis = raw.get("visualization", {})
+        prof = raw.get("profiling", {})
 
         return AppConfig(
             hardware=HardwareConfig(
@@ -129,6 +137,10 @@ class AppConfig:
                 ground_overlay_alpha=vis.get("ground_overlay_alpha", 0.45),
                 ground_colour_bgr=tuple(vis.get("ground_colour_bgr", [0, 220, 80])),
                 colorbar_width=vis.get("colorbar_width", 70),
+            ),
+            profiling=ProfilingConfig(
+                enabled=bool(prof.get("enabled", False)),
+                output_dir=prof.get("output_dir", "profiling"),
             ),
         )
 

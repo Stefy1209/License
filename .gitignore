@@ -560,3 +560,6 @@ App/calibration_files
 
 # SQLite database generated at runtime — machine-specific calibration data
 App/calibrations.db
+
+# Latency profiling CSVs generated at runtime
+App/profiling/

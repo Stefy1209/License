@@ -95,10 +95,15 @@ class SystemViewWidget(QWidget):
         self._depth_toggle = ToggleSwitch("Depth Map", checked=True)
         self._ground_toggle = ToggleSwitch("Show ground overlay", checked=True)
         self._path_toggle = ToggleSwitch("Show path", checked=True)
+        self._profile_toggle = ToggleSwitch(
+            "Profile latency", checked=self._cfg.profiling.enabled
+        )
+        self._profile_toggle.toggled.connect(self._on_profile_toggle)
 
         layout.addWidget(self._depth_toggle)
         layout.addWidget(self._ground_toggle)
         layout.addWidget(self._path_toggle)
+        layout.addWidget(self._profile_toggle)
 
         layout.addSpacing(12)
         sep2 = QFrame()
@@ -237,6 +242,7 @@ class SystemViewWidget(QWidget):
 
         hw = HardwareProfile.from_config(self._cfg)
         self._pipeline = DepthPipeline(self._cfg, hw)
+        self._pipeline.set_profiling_enabled(self._profile_toggle.isChecked())
 
         self._inference_thread = threading.Thread(
             target=self._inference_loop, daemon=True, name="inference"
@@ -266,6 +272,12 @@ class SystemViewWidget(QWidget):
     def _on_back(self):
         self._stop()
         self.back_requested.emit()
+
+    def _on_profile_toggle(self, enabled: bool):
+        """Enable/disable latency profiling live. If the pipeline isn't running
+        yet, the toggle state is applied when it next starts."""
+        if self._pipeline is not None:
+            self._pipeline.set_profiling_enabled(enabled)
 
     def _inference_loop(self):
         """Runs entirely in a background thread — loads model, then loops frames."""
