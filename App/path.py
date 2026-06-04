@@ -5,33 +5,26 @@ from typing import Tuple
 
 def find_starting_point(ground_mask: np.ndarray) -> Tuple[int, int]:
     """
-    Find the starting point at the bottom-center of the ground mask.
-    Scans upward from the bottom row to find the first valid ground pixel
-    near the horizontal center.
+    Find the start point representing the user's position in front of the
+    camera. Anchors at the bottom-center of the image and returns the
+    ground pixel closest to that anchor (Euclidean distance). This keeps
+    the start on the ground mask while staying as low and centered as
+    possible, without bias toward the very bottom row.
 
     Returns
     -------
     (row, col) tuple
     """
     h, w = ground_mask.shape
-    center_col = w // 2
+    anchor_row, anchor_col = h - 1, w // 2
 
-    # Search upward from the bottom, looking for ground near center
-    for row in range(h - 1, -1, -1):
-        # Scan outward from center column to find nearest ground pixel
-        for offset in range(w // 2 + 1):
-            for col in [center_col - offset, center_col + offset]:
-                if 0 <= col < w and ground_mask[row, col]:
-                    return (row, col)
+    ys, xs = np.where(ground_mask)
+    if len(ys) == 0:
+        raise ValueError("No ground pixels found in the mask.")
 
-    # Fallback: return any ground pixel in bottom half
-    bottom_half = ground_mask[h // 2 :, :]
-    ys, xs = np.where(bottom_half)
-    if len(ys) > 0:
-        idx = np.argmin(np.abs(xs - center_col))
-        return (ys[idx] + h // 2, xs[idx])
-
-    raise ValueError("No ground pixels found in the mask.")
+    d2 = (ys - anchor_row) ** 2 + (xs - anchor_col) ** 2
+    idx = int(np.argmin(d2))
+    return (int(ys[idx]), int(xs[idx]))
 
 
 def find_ending_point(ground_mask: np.ndarray) -> Tuple[int, int]:
