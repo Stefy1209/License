@@ -47,7 +47,18 @@ class Picamera2Wrapper:
             return False, None
 
     def release(self) -> None:
-        self._cam.stop()
+        # stop() only halts the stream; close() actually releases the camera
+        # device. Without close(), the next Picamera2(camera_id) fails with
+        # "Camera __init__ sequence did not complete" because the device is
+        # still held by this instance.
+        try:
+            self._cam.stop()
+        except Exception:
+            pass
+        try:
+            self._cam.close()
+        except Exception:
+            pass
 
     def get(self, prop_id: int) -> float:
         if prop_id == cv2.CAP_PROP_FRAME_WIDTH:
