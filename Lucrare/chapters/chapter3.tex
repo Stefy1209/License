@@ -124,7 +124,7 @@ După captare și rectificare, cadrul video este procesat de un model de estimar
 
 \par Prima etapă constă în selecția unui subset de puncte candidate pentru estimarea planului solului. Deoarece solul este vizibil cu precădere în zona inferioară a imaginii, algoritmul eșantionează doar o fracțiune configurabilă din partea de jos a hărții de adâncime (parametrul \texttt{seed\_region}). Pentru a limita costul computațional, se aplică un pas de subșantionare (\textit{stride} = 4), reducând numărul de pixeli evaluați, iar dacă numărul de puncte valide depășește un prag maxim (\texttt{max\_points} = 1500), se aplică o selecție aleatoare suplimentară.
 
-\par Fiecare pixel eșantionat este reproiectat din spațiul imaginii în spațiul 3D al camerei folosind relațiile geometrice standard derivate din modelul pinhole al camerei:
+\par Fiecare pixel eșantionat este reproiectat din spațiul imaginii în spațiul 3D al camerei folosind relațiile geometrice standard derivate din modelul pinhole al camerei \cite{hartley2004}:
 
 \begin{equation}
     X = \frac{(u - c_x) \cdot z}{f_x}, \quad
