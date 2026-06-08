@@ -6,7 +6,7 @@ from typing import Optional
 
 import cv2
 import numpy as np
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSizePolicy, QDialog, QPushButton
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSizePolicy, QDialog, QPushButton, QMessageBox
 from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtGui import QImage, QPixmap, QPainter, QColor, QIcon
 
@@ -33,9 +33,10 @@ class CalibrationWidget(QWidget):
 
     back_requested = pyqtSignal()
 
-    def __init__(self, cfg, parent: QWidget = None):
+    def __init__(self, cfg, hw=None, parent: QWidget = None):
         super().__init__(parent)
         self._cfg = cfg
+        self._hw = hw
 
         # Root layout is created once and never recreated.
         root = QVBoxLayout(self)
@@ -145,6 +146,9 @@ class CalibrationWidget(QWidget):
             rows = cfg.calibration.rows,
             square_mm = cfg.calibration.square_mm,
             min_frames = cfg.calibration.min_frames,
+            hw = self._hw,
+            width = cfg.camera.width,
+            height = cfg.camera.height,
             parent = self,
         )
         dialog.exec()
@@ -246,7 +250,7 @@ class _CalibrationDialog(QDialog):
 
     _frame_ready = pyqtSignal(np.ndarray, int, int)
     _result_ready = pyqtSignal(float)
-    _aborted = pyqtSignal()
+    _aborted = pyqtSignal(str)
 
     def __init__(
         self,
@@ -256,6 +260,9 @@ class _CalibrationDialog(QDialog):
         rows: int,
         square_mm: float,
         min_frames: int,
+        hw=None,
+        width: int = 640,
+        height: int = 480,
         parent: QWidget = None,
     ):
         super().__init__(parent)
@@ -265,6 +272,9 @@ class _CalibrationDialog(QDialog):
         self._rows = rows
         self._square_mm = square_mm
         self._min_frames = min_frames
+        self._hw = hw
+        self._width = width
+        self._height = height
 
         self._stop_event = threading.Event()
         self._capture_thread = None
@@ -275,7 +285,7 @@ class _CalibrationDialog(QDialog):
         self._build()
         self._frame_ready.connect(self._on_frame)
         self._result_ready.connect(self._on_result)
-        self._aborted.connect(self.close)
+        self._aborted.connect(self._on_aborted)
 
     def _build(self):
         root = QVBoxLayout(self)
@@ -357,6 +367,47 @@ class _CalibrationDialog(QDialog):
         self._stop_event.set()
         self.close()
 
+    def _on_aborted(self, message: str):
+        """Runs on the GUI thread: show why capture stopped, then close."""
+        if message:
+            QMessageBox.critical(self, "Camera Calibration", message)
+        self.close()
+
+    def _open_camera(self):
+        """
+        Open the camera with the backend appropriate for the active hardware,
+        mirroring camera.open_camera but GUI-safe (returns an error instead of
+        calling sys.exit). Returns (camera, None) or (None, error_message).
+        """
+        is_rpi = self._hw is not None and self._hw.is_rpi
+
+        if is_rpi:
+            try:
+                from camera import Picamera2Wrapper
+                return Picamera2Wrapper(self._camera_id, self._width, self._height), None
+            except ImportError:
+                pass  # fall back to OpenCV below (e.g. a USB webcam on the Pi)
+            except Exception as exc:
+                return None, f"Could not start the Pi camera (picamera2):\n{exc}"
+
+        cap = cv2.VideoCapture(self._camera_id)
+        if not cap.isOpened():
+            if is_rpi:
+                return None, (
+                    f"Could not open camera (index {self._camera_id}).\n\n"
+                    "On the Raspberry Pi 5 the CSI camera works only through "
+                    "picamera2. Install it with:\n"
+                    "    sudo apt install -y python3-picamera2"
+                )
+            return None, (
+                f"Could not open camera with index {self._camera_id}.\n"
+                "Check the camera index in Settings and the connection."
+            )
+        if is_rpi:
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, self._width)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self._height)
+        return cap, None
+
     def _capture_loop(self):
         pattern  = (self._cols, self._rows)
         criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
@@ -367,9 +418,9 @@ class _CalibrationDialog(QDialog):
 
         real_world_pts, image_pts = [], []
 
-        cap = cv2.VideoCapture(self._camera_id)
-        if not cap.isOpened():
-            self._aborted.emit()
+        cap, error = self._open_camera()
+        if cap is None:
+            self._aborted.emit(error)
             return
 
         cooldown, last_capture, n_captured = 3.0, -1.0, 0
@@ -419,7 +470,7 @@ class _CalibrationDialog(QDialog):
             self._result_ready.emit(float(rms))
         else:
             if not self._stop_event.is_set():
-                self._aborted.emit()
+                self._aborted.emit("Camera feed lost before calibration finished.")
 
     def _save_to_library(self, rms: float) -> None:
         """Auto-saves the calibration to the DB library (non-critical, runs in caller thread)."""

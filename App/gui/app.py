@@ -58,7 +58,9 @@ class MainWindow(QMainWindow):
         self._push(w)
 
     def _show_calibration(self):
-        w = CalibrationWidget(self._cfg)
+        from hardware import HardwareProfile
+        hw = HardwareProfile.from_config(self._cfg)
+        w = CalibrationWidget(self._cfg, hw)
         w.back_requested.connect(self._show_main)
         self._push(w)
 
