@@ -40,9 +40,3 @@ window_title = "DA3 Calibrated Live Feed"
 ground_overlay_alpha = 0.45
 ground_colour_bgr = [0, 220, 80]
 colorbar_width = 70
-
-[profiling]
-# Measure per-stage latency (depth/ground/path/…) and write a CSV per run.
-# Leave disabled for normal use so the pipeline pays no measurement overhead.
-enabled = false
-output_dir = "profiling"

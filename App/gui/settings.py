@@ -6,6 +6,12 @@ from PyQt6.QtCore import QTimer, pyqtSignal, Qt
 from gui.components import NavBar, StyledButton, SectionHeader
 
 
+# Depth mode is not user-selectable: it is dictated by the hardware profile.
+# NVIDIA runs the metric DA3 model; the RPi/Hailo HEF is a relative DA2 model.
+# Deriving it here makes a profile/depth_mode mismatch impossible from the UI.
+_PROFILE_DEPTH_MODE = {"nvidia": "metric", "rpi": "relative"}
+
+
 class SettingsWidget(QWidget):
     """
     Editable form for config.toml.
@@ -30,6 +36,18 @@ class SettingsWidget(QWidget):
 
         navbar = NavBar("Settings")
         navbar.back_clicked.connect(self.back_requested)
+
+        # Save lives in the navbar (next to Back) so it stays visible while the
+        # form scrolls.
+        self._status_lbl = QLabel("")
+        self._status_lbl.setObjectName("success")
+        navbar.add_right_widget(self._status_lbl)
+
+        save_btn = StyledButton("Save Settings", icon_name="document-save")
+        save_btn.setMinimumWidth(160)
+        save_btn.clicked.connect(self._save)
+        navbar.add_right_widget(save_btn)
+
         root.addWidget(navbar)
 
         scroll = QScrollArea()
@@ -45,8 +63,19 @@ class SettingsWidget(QWidget):
         cfg = self._cfg
 
         form.addWidget(SectionHeader("Hardware"))
-        self._profile = _DropdownRow(form, "Profile", cfg.hardware.profile, ["nvidia", "rpi"])
-        self._depth_mode = _DropdownRow(form, "Depth mode", cfg.hardware.depth_mode, ["metric", "relative"])
+        self._profile = _DropdownRow(
+            form, "Profile", cfg.hardware.profile, ["nvidia", "rpi"],
+            on_change=self._on_profile_changed,
+        )
+        # Depth mode is shown for transparency but is read-only: it is derived
+        # from the profile (nvidia → metric, rpi → relative).
+        self._depth_mode = _DropdownRow(
+            form, "Depth mode",
+            _PROFILE_DEPTH_MODE.get(cfg.hardware.profile, "metric"),
+            ["metric", "relative"],
+            tip="auto-set by profile",
+            enabled=False,
+        )
 
 
         form.addWidget(SectionHeader("Camera"))
@@ -78,26 +107,14 @@ class SettingsWidget(QWidget):
         self._rpi_w = _FieldRow(form, "Model input width", str(cfg.rpi.model_input_width))
         self._rpi_h = _FieldRow(form, "Model input height", str(cfg.rpi.model_input_height))
 
-        form.addSpacing(32)
-        save_row = QWidget()
-        save_layout = QHBoxLayout(save_row)
-        save_layout.setContentsMargins(0, 0, 0, 0)
-
-        self._status_lbl = QLabel("")
-        self._status_lbl.setObjectName("success")
-        save_layout.addWidget(self._status_lbl)
-        save_layout.addStretch()
-
-        save_btn = StyledButton("Save Settings", icon_name="document-save")
-        save_btn.setMinimumWidth(200)
-        save_btn.clicked.connect(self._save)
-        save_layout.addWidget(save_btn)
-
-        form.addWidget(save_row)
         form.addStretch()
 
         scroll.setWidget(inner)
         root.addWidget(scroll)
+
+    def _on_profile_changed(self, profile: str):
+        """Keep the read-only depth-mode field in sync with the chosen profile."""
+        self._depth_mode.set_value(_PROFILE_DEPTH_MODE.get(profile, "metric"))
 
     def _save(self):
         try:
@@ -132,7 +149,8 @@ class SettingsWidget(QWidget):
         return {
             "hardware": {
                 "profile":    self._profile.value(),
-                "depth_mode": self._depth_mode.value(),
+                # Derived from profile, never trusted from the (disabled) field.
+                "depth_mode": _PROFILE_DEPTH_MODE.get(self._profile.value(), "metric"),
             },
             "camera": {
                 "id":               _int(self._cam_id,      "Camera ID"),
@@ -224,7 +242,9 @@ class _FieldRow:
 class _DropdownRow:
     """A label + QComboBox row, added directly to a QVBoxLayout."""
 
-    def __init__(self, layout: QVBoxLayout, label: str, current: str, options: list[str]):
+    def __init__(self, layout: QVBoxLayout, label: str, current: str,
+                 options: list[str], tip: str = "", enabled: bool = True,
+                 on_change=None):
         row = QWidget()
         row_layout = QHBoxLayout(row)
         row_layout.setContentsMargins(0, 4, 0, 4)
@@ -241,10 +261,24 @@ class _DropdownRow:
         idx = self._combo.findText(current)
         if idx >= 0:
             self._combo.setCurrentIndex(idx)
+        self._combo.setEnabled(enabled)
+        if on_change is not None:
+            self._combo.currentTextChanged.connect(on_change)
         row_layout.addWidget(self._combo)
+
+        if tip:
+            tip_lbl = QLabel(tip)
+            tip_lbl.setObjectName("dim")
+            row_layout.addWidget(tip_lbl)
+
         row_layout.addStretch()
 
         layout.addWidget(row)
 
     def value(self) -> str:
         return self._combo.currentText()
+
+    def set_value(self, value: str):
+        idx = self._combo.findText(value)
+        if idx >= 0:
+            self._combo.setCurrentIndex(idx)
