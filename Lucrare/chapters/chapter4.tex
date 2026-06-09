@@ -51,7 +51,7 @@ Funcțiile pure sunt preferate claselor atunci când nu există stare internă d
 
 \subsection{Configurație Tipizată prin Dataclasses}
 
-Configurația aplicației este citită o singură dată la pornire din fișierul \texttt{config.toml} și transformată într-un arbore de \texttt{dataclass}-uri imutabile (\texttt{frozen=True}): \texttt{AppConfig}, \texttt{CameraConfig}, \texttt{CalibrationConfig}, \texttt{GroundConfig} etc. Această abordare elimină accesul prin chei de tip șir de caractere și înlocuiește șirul de caractere cu atribute tipizate, ceea ce permite detectarea erorilor de configurare la încărcare, nu la rulare, și oferă autocompletare în mediile de dezvoltare.
+Configurația aplicației este citită o singură dată la pornire din fișierul \texttt{config.toml} și transformată într-un arbore de \texttt{dataclass}-uri imutabile (\texttt{frozen=True}): \texttt{AppConfig}, \texttt{CameraConfig}, \texttt{CalibrationConfig}, \texttt{GroundConfig}, \texttt{ProfilingConfig} etc. Această abordare elimină accesul prin chei de tip șir de caractere și înlocuiește șirul de caractere cu atribute tipizate, ceea ce permite detectarea erorilor de configurare la încărcare, nu la rulare, și oferă autocompletare în mediile de dezvoltare.
 
 \subsection{Comunicare Asincronă prin Semnale Qt}
 
@@ -63,7 +63,7 @@ Modulul \texttt{model.py} acționează ca un registru de factory: în funcție d
 
 \section{Diagrama de Clase}
 
-Figura~\ref{fig:classdiagram} prezintă clasele principale ale aplicației și relațiile dintre acestea. Săgețile continue indică asocieri de utilizare, iar săgețile întrerupte indică dependențe sau relații de creare.
+Figura~\ref{fig:classdiagram} prezintă clasele principale ale aplicației și relațiile dintre acestea. Conform notației UML, săgețile continue reprezintă \emph{asocieri}: clasa sursă păstrează o referință de durată (un câmp) către clasa țintă. Săgețile întrerupte reprezintă \emph{dependențe}: clasa sursă doar creează sau folosește tranzitoriu un obiect, fără a-l reține ca stare. Relația de instanțiere este marcată suplimentar cu stereotipul standard $\ll$\textit{create}$\gg$.
 
 \begin{figure}[htbp]
 \centering
@@ -121,14 +121,14 @@ Figura~\ref{fig:classdiagram} prezintă clasele principale ale aplicației și r
 };
 
 % Row 2
-\node[umlclass] (MainWindow) at (0, 4.5) {
-    \textbf{MainWindow}
+\node[umlclass] (SysView) at (0, 4.5) {
+    \textbf{SystemViewWidget}
     \nodepart{two}
     \texttt{-pipeline: DepthPipeline}\\
     \texttt{-cfg: AppConfig}
     \nodepart{three}
-    \texttt{+start\_pipeline()}\\
-    \texttt{+stop\_pipeline()}
+    \texttt{-\_start()}\\
+    \texttt{-\_stop()}
 };
 
 \node[umlclass] (Pipeline) at (5.5, 4.5) {
@@ -161,16 +161,18 @@ Figura~\ref{fig:classdiagram} prezintă clasele principale ale aplicației și r
     \texttt{+depth\_map: ndarray}\\
     \texttt{+ground\_mask: ndarray}\\
     \texttt{+path: ndarray}\\
+    \texttt{+start\_point: tuple}\\
+    \texttt{+end\_point: tuple}\\
     \texttt{+plane: ndarray}
 };
 
 % Relationships
-\draw[dep]  (CalibSvc.east)      -- node[above]{\textit{uses}} (AppConfig.west);
-\draw[dep]  (MainWindow.east)    -- node[above]{\textit{uses}} (Pipeline.west);
+\draw[assoc](CalibSvc.east)      -- node[above]{\textit{uses}} (AppConfig.west);
+\draw[assoc](SysView.east)       -- node[above]{\textit{owns}} (Pipeline.west);
 \draw[assoc](Pipeline.north)     -- node[right]{\textit{uses}} (AppConfig.south);
-\draw[assoc](Pipeline.east)      -- node[above]{\textit{uses}} (ModelReg.west);
+\draw[assoc](Pipeline.east)      -- node[above]{\textit{owns}} (ModelReg.west);
 \draw[assoc](ModelReg.north)     -- node[right]{\textit{uses}} (HwProfile.south);
-\draw[dep]  (Pipeline.south)     -- node[right]{\textit{creates}} (FrameResult.north);
+\draw[dep]  (Pipeline.south)     -- node[right]{$\ll$\textit{create}$\gg$} (FrameResult.north);
 
 \end{tikzpicture}
 \caption{Diagrama de clase UML a componentelor principale ale aplicației.}
@@ -186,8 +188,9 @@ Aplicația este organizată în patru straturi distincte, cu dependențe strict 
 Corespunde pachetului \texttt{gui/} și este responsabil exclusiv de interacțiunea cu utilizatorul. Conține:
 \begin{itemize}
     \item \texttt{app.py} — fereastra principală (\texttt{MainWindow}), care gestionează navigarea între ecrane printr-un \texttt{QStackedWidget};
-    \item \texttt{main\_menu.py} — ecranul de pornire cu cele patru acțiuni principale;
+    \item \texttt{main\_menu.py} — ecranul de pornire, care expune acțiunile principale ale aplicației: calibrarea camerei, biblioteca de calibrări, pornirea sistemului și editarea setărilor;
     \item \texttt{calibration.py} — ecranul de calibrare, inclusiv dialogul modal cu previzualizare live și afișarea scorului RMS;
+    \item \texttt{calibration\_manager.py} — ecranul bibliotecii de calibrări, care expune vizual operațiile CRUD asupra calibrărilor salvate (listare, aplicare, import, export, editare a metadatelor și ștergere);
     \item \texttt{settings.py} — formularul de editare a configurației, cu scriere înapoi în \texttt{config.toml};
     \item \texttt{system\_view.py} — vizualizarea live a sistemului, cu bara laterală de opțiuni și redarea cadrelor procesate;
     \item \texttt{components.py} — widget-uri reutilizabile: \texttt{StyledButton}, \texttt{NavBar}, \texttt{ToggleSwitch}, \texttt{SectionHeader}, \texttt{StatusBadge};
@@ -202,7 +205,8 @@ Corespunde modulului \texttt{pipeline.py} și reprezintă punctul central de coo
 \begin{itemize}
     \item un fir de captură dedicat, care citește continuu cadre de la cameră și păstrează întotdeauna cel mai recent cadru disponibil;
     \item un fir de inferență, care consumă cadrele, rulează pipeline-ul complet și emite rezultate prin semnale Qt;
-    \item starea internă a sistemului: hărțile de corecție a distorsiunii, matricea intrinsecă activă, planul anterior detectat.
+    \item starea internă a sistemului: hărțile de corecție a distorsiunii, matricea intrinsecă activă, planul anterior detectat;
+    \item un profiler de latență (\texttt{FrameProfiler}), care măsoară opțional durata fiecărei etape, detaliat în Secțiunea~\ref{sec:profiling}.
 \end{itemize}
 
 Rezultatul unui cadru procesat este reprezentat de dataclass-ul \texttt{FrameResult}, care agregă cadrul RGB, harta de adâncime, masca solului, traiectoria A*, punctele de start/stop și coeficienții planului.
@@ -227,6 +231,7 @@ Conține modulele care nu realizează procesare propriu-zisă, ci furnizează co
     \item \texttt{model.py} — \texttt{ModelRegistry}: factory care deleghează încărcarea și inferența modelului de adâncime;
     \item \texttt{model\_nvidia.py} — backend PyTorch + CUDA, folosind DepthAnything3 cu AMP și \texttt{torch.compile} opțional;
     \item \texttt{model\_rpi.py} — backend Hailo, folosind \texttt{hailort} pentru inferența pe NPU-ul Hailo-8;
+    \item \texttt{profiling.py} — \texttt{FrameProfiler}: instrumentarea pentru măsurarea latenței per etapă a pipeline-ului (Secțiunea~\ref{sec:profiling});
     \item \texttt{main.py} — punctul de intrare în aplicație; lansează GUI-ul sau modul headless.
 \end{itemize}
 
@@ -296,7 +301,7 @@ Figura~\ref{fig:seqdiagram} ilustrează interacțiunea dintre componente pentru 
 \draw[->, dashed] (11.0, -3.4) -- node[above]{model ready} (6.7, -3.4);
 
 % ── Loop box ──────────────────────────────────────────────────────────
-\draw[thick] (0.2, -4.2) rectangle (12.8, -10.5);
+\draw[thick] (0.2, -4.2) rectangle (12.8, -11.3);
 \node[anchor=north west, font=\scriptsize\itshape] at (0.2, -4.2) {loop [fiecare cadru]};
 
 % ── Per-frame messages ────────────────────────────────────────────────
@@ -342,10 +347,23 @@ Aplicația include un subsistem dedicat stocării și gestionării calibrărilor
 
 Validarea este delegată clasei \texttt{CalibrationValidator}, care verifică RMS-ul, integritatea fișierului \texttt{.npz} și lungimea câmpurilor text înainte de orice operație de scriere.
 
+\section{Instrumentarea pentru Profilarea Latenței}
+\label{sec:profiling}
+
+Pentru evaluarea cantitativă a performanței (prezentată în Capitolul~\ref{chap:ch5}), aplicația include un subsistem de instrumentare care măsoară durata fiecărei etape a pipeline-ului, cadru cu cadru. Proiectarea acestuia urmărește două cerințe aparent contradictorii: să ofere măsurători precise atunci când profilarea este activă, dar să nu introducă niciun cost atunci când este dezactivată, pentru a nu denatura comportamentul normal al sistemului.
+
+\textbf{Strategie interschimbabilă.} Pipeline-ul comunică întotdeauna cu o interfață abstractă, \texttt{FrameProfiler}, fără a cunoaște implementarea concretă. Există două strategii (\textit{Strategy pattern}): \texttt{NullProfiler}, folosit când profilarea este dezactivată, ale cărui metode sunt operații vide (\textit{Null Object}) și care returnează un singur context reutilizabil, astfel încât calea critică nu plătește practic nimic; și \texttt{LatencyProfiler}, care cronometrează efectiv etapele. Funcția-fabrică \texttt{make\_profiler()} construiește strategia potrivită pe baza configurației, eliminând astfel ramificațiile condiționale din interiorul buclei de procesare.
+
+\textbf{Măsurare per etapă.} Fiecare etapă sincronă a pipeline-ului — corecția distorsiunii, estimarea adâncimii, detecția solului și determinarea drumului — este încadrată într-un context manager \texttt{profiler.stage(name)}, care măsoară durata blocului cu \texttt{time.perf\_counter()}. Suma acestor patru etape constituie timpul total de procesare per cadru. Captura cadrului, care rulează pe firul de captură separat, este raportată informativ, dar exclusă din total. La finalul fiecărui cadru, \texttt{commit\_frame()} agregă timpii acumulați într-un singur eșantion.
+
+\textbf{Scriere în loturi.} Pentru a evita operații de intrare/ieșire pe calea critică, eșantioanele sunt acumulate în memorie și scrise pe disc în loturi (implicit la fiecare 50 de cadre și la oprire). Fișierul CSV rezultat este denumit automat astfel încât să codifice profilul hardware și modul de adâncime sub care au fost colectate datele (de exemplu \texttt{latency\_nvidia\_metric\_20260604\_153012.csv}), păstrând măsurătorile legate de condițiile în care au fost obținute. Orice eroare de scriere este izolată, astfel încât profilarea să nu poată întrerupe niciodată pipeline-ul.
+
+\textbf{Activare în timpul rulării.} Comutatorul \textit{Profile latency} din bara laterală a ecranului de vizualizare permite pornirea și oprirea profilării fără a reporni sistemul. Metoda \texttt{set\_profiling\_enabled()} înlocuiește referința strategiei active — pornirea inițiază un nou fișier CSV, iar oprirea îl golește și îl închide. Deoarece înlocuirea referinței este atomică sub GIL, operația este sigură față de firul de inferență care citește strategia activă.
+
 \section{Fluxul de Date}
 
 La pornirea sistemului, \texttt{MainWindow} încarcă configurația tipizată din \texttt{config.toml} printr-un apel la \texttt{AppConfig.load()}. Când utilizatorul apasă butonul \textit{START} din ecranul de vizualizare live, \texttt{SystemViewWidget} instanțiază un \texttt{DepthPipeline} și pornește firul de inferență. Acesta inițializează \texttt{ModelRegistry} (care, în funcție de profilul hardware, încarcă fie modelul PyTorch, fie fișierul HEF pentru Hailo), deschide camera prin \texttt{CameraFactory} și pornește firul de captură.
 
-La fiecare cadru disponibil, pipeline-ul aplică corecția de distorsiune, rulează inferența pentru a obține harta de adâncime, detectează planul solului prin RANSAC vectorizat și construiește masca, planifică traiectoria prin A*, și împachetează toate rezultatele într-un obiect \texttt{FrameResult}. Acesta este transmis stratului de prezentare prin semnalul Qt \texttt{result\_signal}, unde \texttt{SystemViewWidget} aplică suprapunerile vizuale și actualizează widget-ul de afișare.
+La fiecare cadru disponibil, pipeline-ul aplică corecția de distorsiune, rulează inferența pentru a obține harta de adâncime, detectează planul solului prin RANSAC vectorizat și construiește masca, planifică traiectoria prin A*, și împachetează toate rezultatele într-un obiect \texttt{FrameResult}. Dacă profilarea este activă, durata fiecăreia dintre aceste etape este măsurată și înregistrată (Secțiunea~\ref{sec:profiling}). Acesta este transmis stratului de prezentare prin semnalul Qt \texttt{result\_signal}, unde \texttt{SystemViewWidget} aplică suprapunerile vizuale și actualizează widget-ul de afișare.
 
 Utilizatorul poate modifica parametrii sistemului în orice moment prin ecranul \textit{Settings}, care scrie valorile actualizate înapoi în \texttt{config.toml} și semnalizează ferestrei principale să reîncarce configurația. Modificările intră în vigoare la următoarea pornire a pipeline-ului.
