@@ -3,9 +3,10 @@
 \usepackage{palatino}                           % font
 \usepackage[onehalfspacing]{setspace}           % 1.5 distance between lines
 \usepackage[utf8]{inputenc}                     % encoding
+\usepackage[T1]{fontenc}                        % font encoding (enables hyphenation of words with diacritics)
 \usepackage{graphicx}                           % images
 \usepackage{booktabs}                           % professional tables
-\usepackage{url}                                % links
+\usepackage{xurl}                               % links (breakable URLs)
 \usepackage[nottoc, notlof, notlot]{tocbibind}  % table of contents style
 \usepackage[unicode]{hyperref}                  % references from the table of contents
 \usepackage{etoolbox,ifthen} 	                % ifthen type of commands
@@ -14,6 +15,9 @@
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usetikzlibrary{shapes.geometric, arrows.meta, positioning, shadows, shapes.multipart, decorations.pathmorphing}
+\usepackage{microtype}                          % micro-typography: reduces lines overflowing the margin
+\setlength{\emergencystretch}{3em}              % last-resort stretch so lines stay within the margin
+\usepackage{subcaption}                         % subfigures: paired images as (a)/(b) under one figure
 
 % Definirea stilurilor de blocuri
 \tikzset{

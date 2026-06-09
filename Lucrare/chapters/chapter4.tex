@@ -51,7 +51,7 @@ Funcțiile pure sunt preferate claselor atunci când nu există stare internă d
 
 \subsection{Configurație Tipizată prin Dataclasses}
 
-Configurația aplicației este citită o singură dată la pornire din fișierul \texttt{config.toml} și transformată într-un arbore de \texttt{dataclass}-uri imutabile (\texttt{frozen=True}): \texttt{AppConfig}, \texttt{CameraConfig}, \texttt{CalibrationConfig}, \texttt{GroundConfig}, \texttt{ProfilingConfig} etc. Această abordare elimină accesul prin chei de tip șir de caractere și înlocuiește șirul de caractere cu atribute tipizate, ceea ce permite detectarea erorilor de configurare la încărcare, nu la rulare, și oferă autocompletare în mediile de dezvoltare.
+Configurația aplicației este citită o singură dată la pornire din fișierul \texttt{config.toml} și transformată într-un arbore de \texttt{dataclass}-uri imutabile (\texttt{frozen=True}): \texttt{App\allowbreak Config}, \texttt{Camera\allowbreak Config}, \texttt{Calibration\allowbreak Config}, \texttt{Ground\allowbreak Config}, \texttt{Profiling\allowbreak Config} etc. Această abordare elimină accesul prin chei de tip șir de caractere și înlocuiește șirul de caractere cu atribute tipizate, ceea ce permite detectarea erorilor de configurare la încărcare, nu la rulare, și oferă autocompletare în mediile de dezvoltare.
 
 \subsection{Comunicare Asincronă prin Semnale Qt}
 
@@ -229,7 +229,7 @@ Conține modulele care nu realizează procesare propriu-zisă, ci furnizează co
     \item \texttt{config.py} — citirea fișierului \texttt{config.toml} și construirea arborelui de \texttt{dataclass}-uri tipizate;
     \item \texttt{hardware.py} — \texttt{HardwareProfile}: abstractizarea profilului activ și selecția dispozitivului de calcul;
     \item \texttt{model.py} — \texttt{ModelRegistry}: factory care deleghează încărcarea și inferența modelului de adâncime;
-    \item \texttt{model\_nvidia.py} — backend PyTorch + CUDA, folosind DepthAnything3 cu AMP și \texttt{torch.compile} opțional;
+    \item \texttt{model\_nvidia.py} — backend PyTorch + CUDA, folosind Depth Anything 3 cu AMP și \texttt{torch.compile} opțional;
     \item \texttt{model\_rpi.py} — backend Hailo, folosind \texttt{hailort} pentru inferența pe NPU-ul Hailo-8;
     \item \texttt{profiling.py} — \texttt{FrameProfiler}: instrumentarea pentru măsurarea latenței per etapă a pipeline-ului (Secțiunea~\ref{sec:profiling});
     \item \texttt{main.py} — punctul de intrare în aplicație; lansează GUI-ul sau modul headless.
@@ -354,7 +354,7 @@ Pentru evaluarea cantitativă a performanței (prezentată în Capitolul~\ref{ch
 
 \textbf{Strategie interschimbabilă.} Pipeline-ul comunică întotdeauna cu o interfață abstractă, \texttt{FrameProfiler}, fără a cunoaște implementarea concretă. Există două strategii (\textit{Strategy pattern}): \texttt{NullProfiler}, folosit când profilarea este dezactivată, ale cărui metode sunt operații vide (\textit{Null Object}) și care returnează un singur context reutilizabil, astfel încât calea critică nu plătește practic nimic; și \texttt{LatencyProfiler}, care cronometrează efectiv etapele. Funcția-fabrică \texttt{make\_profiler()} construiește strategia potrivită pe baza configurației, eliminând astfel ramificațiile condiționale din interiorul buclei de procesare.
 
-\textbf{Măsurare per etapă.} Fiecare etapă sincronă a pipeline-ului — corecția distorsiunii, estimarea adâncimii, detecția solului și determinarea drumului — este încadrată într-un context manager \texttt{profiler.stage(name)}, care măsoară durata blocului cu \texttt{time.perf\_counter()}. Suma acestor patru etape constituie timpul total de procesare per cadru. Captura cadrului, care rulează pe firul de captură separat, este raportată informativ, dar exclusă din total. La finalul fiecărui cadru, \texttt{commit\_frame()} agregă timpii acumulați într-un singur eșantion.
+\textbf{Măsurare per etapă.} Fiecare etapă sincronă a pipeline-ului, corecția distorsiunii, estimarea adâncimii, detecția solului și determinarea drumului, este încadrată într-un context manager \texttt{profiler.stage(name)}, care măsoară durata blocului cu \texttt{time.perf\_counter()}. Suma acestor patru etape constituie timpul total de procesare per cadru. Captura cadrului, care rulează pe firul de captură separat, este raportată informativ, dar exclusă din total. La finalul fiecărui cadru, \texttt{commit\_frame()} agregă timpii acumulați într-un singur eșantion.
 
 \textbf{Scriere în loturi.} Pentru a evita operații de intrare/ieșire pe calea critică, eșantioanele sunt acumulate în memorie și scrise pe disc în loturi (implicit la fiecare 50 de cadre și la oprire). Fișierul CSV rezultat este denumit automat astfel încât să codifice profilul hardware și modul de adâncime sub care au fost colectate datele (de exemplu \texttt{latency\_nvidia\_metric\_20260604\_153012.csv}), păstrând măsurătorile legate de condițiile în care au fost obținute. Orice eroare de scriere este izolată, astfel încât profilarea să nu poată întrerupe niciodată pipeline-ul.
 

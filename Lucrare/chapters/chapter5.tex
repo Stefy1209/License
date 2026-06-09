@@ -3,7 +3,7 @@
 
 În acest capitol sunt prezentate rezultate obținute în condiții reale de utilizare. Sunt analizate atât cazuri în care fiecare componentă a sistemului funcționează conform așteptărilor, cât și situații în care o etapă a pipeline-ului produce rezultate inexacte, pentru a evidenția deopotrivă capabilitățile și limitările sistemului.
 
-Testarea sistemului bazat pe Raspberry Pi necesită un monitor, dispozitive periferice (mouse și tastatură) și o sursă de alimentare capabilă să livreze 5,1 V la 5 A, o configurație disponibilă rar pe piață. Din acest motiv, colectarea de date pe această platformă a fost limitată, iar pentru evaluarea vizuală s-a utilizat un singur scenariu, comparat cu sistemul bazat pe platforma NVidia. În fiecare secțiune este analizată mai întâi platforma NVidia, urmată de comparația cu Raspberry Pi.
+Testarea sistemului bazat pe Raspberry Pi necesită un monitor, dispozitive periferice (mouse și tastatură) și o sursă de alimentare capabilă să livreze 5,1 V la 5 A, o configurație disponibilă rar pe piață. Din acest motiv, colectarea de date pe această platformă a fost limitată, iar pentru evaluarea vizuală s-a utilizat un singur scenariu, comparat cu sistemul bazat pe platforma NVIDIA. În fiecare secțiune este analizată mai întâi platforma NVIDIA, urmată de comparația cu Raspberry Pi.
 
 Secțiunile \ref{sec:ch5sec1}, \ref{sec:ch5sec2} și \ref{sec:ch5sec3} se bazează pe o evaluare vizuală, folosind imagini capturate în timpul rulării. Secțiunea \ref{sec:ch5sec4} prezintă o evaluare cantitativă a latenței.
 
@@ -12,25 +12,25 @@ Secțiunile \ref{sec:ch5sec1}, \ref{sec:ch5sec2} și \ref{sec:ch5sec3} se bazeaz
 
 Hărțile de adâncime prezentate în această secțiune au fost vizualizate prin aplicarea unei palete de culori de tip \textit{inferno}: punctele apropiate de cameră sunt reprezentate în tonuri închise, iar cele îndepărtate în tonuri deschise.
 
-Pe platforma bazată pe NVidia, estimarea adâncimii produce rezultate consistente în scenarii diferite, atât interioare, cât și exterioare. Figurile \ref{fig:exterior_estimare} și \ref{fig:interior_estimare} prezintă două astfel de exemple.
+Pe platforma bazată pe NVIDIA, estimarea adâncimii produce rezultate consistente în scenarii diferite, atât interioare, cât și exterioare. Figurile \ref{fig:exterior_estimare} și \ref{fig:interior_estimare} prezintă două astfel de exemple.
 
 \begin{figure}[htbp]
     \centering
     % Prima imagine (stânga)
-    \begin{minipage}{0.48\textwidth}
+    \begin{subfigure}[t]{0.48\textwidth}
         \centering
         \includegraphics[width=\linewidth]{figures/real_world_examples/nvidia/20260604_114449_1_original.png}
         \caption{Imagine exterioară captată după aplicarea corecției.}
         \label{fig:exterior_original}
-    \end{minipage}
+    \end{subfigure}
     \hfill % Adaugă spațiu elastic între cele două imagini
     % A doua imagine (dreapta)
-    \begin{minipage}{0.48\textwidth}
+    \begin{subfigure}[t]{0.48\textwidth}
         \centering
         \includegraphics[width=\linewidth]{figures/real_world_examples/nvidia/20260604_114449_2_depth.png}
         \caption{Harta de adâncime estimată.}
         \label{fig:exterior_depth}
-    \end{minipage}
+    \end{subfigure}
     \caption{Comparație între imaginea originală și harta de adâncime într-un scenariu exterior.}
     \label{fig:exterior_estimare}
 \end{figure}
@@ -38,20 +38,20 @@ Pe platforma bazată pe NVidia, estimarea adâncimii produce rezultate consisten
 \begin{figure}[htbp]
     \centering
     % Prima imagine (stânga)
-    \begin{minipage}{0.48\textwidth}
+    \begin{subfigure}[t]{0.48\textwidth}
         \centering
         \includegraphics[width=\linewidth]{figures/real_world_examples/nvidia/20260604_115839_1_original.png}
         \caption{Imagine interioară captată după aplicarea corecției.}
         \label{fig:interior_original}
-    \end{minipage}
+    \end{subfigure}
     \hfill % Adaugă spațiu elastic între cele două imagini
     % A doua imagine (dreapta)
-    \begin{minipage}{0.48\textwidth}
+    \begin{subfigure}[t]{0.48\textwidth}
         \centering
         \includegraphics[width=\linewidth]{figures/real_world_examples/nvidia/20260604_115839_2_depth.png}
         \caption{Harta de adâncime estimată.}
         \label{fig:interior_depth}
-    \end{minipage}
+    \end{subfigure}
     \caption{Comparație între imaginea originală și harta de adâncime într-un scenariu interior.}
     \label{fig:interior_estimare}
 \end{figure}
@@ -61,20 +61,20 @@ Platforma bazată pe Raspberry Pi dispune de resurse de calcul reduse și utiliz
 \begin{figure}[htbp]
     \centering
     % Prima imagine (stânga)
-    \begin{minipage}{0.48\textwidth}
+    \begin{subfigure}[t]{0.48\textwidth}
         \centering
         \includegraphics[width=\linewidth]{figures/real_world_examples/rpi/20260608_224242_1_original.png}
         \caption{Imagine interioară captată după aplicarea corecției (Raspberry Pi + Hailo-8).}
         \label{fig:interior_original_rpi}
-    \end{minipage}
+    \end{subfigure}
     \hfill % Adaugă spațiu elastic între cele două imagini
     % A doua imagine (dreapta)
-    \begin{minipage}{0.48\textwidth}
+    \begin{subfigure}[t]{0.48\textwidth}
         \centering
         \includegraphics[width=\linewidth]{figures/real_world_examples/rpi/20260608_224242_2_depth.png}
         \caption{Harta de adâncime estimată (Raspberry Pi + Hailo-8).}
         \label{fig:interior_depth_rpi}
-    \end{minipage}
+    \end{subfigure}
     \caption{Comparație între imaginea originală și harta de adâncime într-un scenariu interior (Raspberry Pi + Hailo-8).}
     \label{fig:interior_estimare_rpi}
 \end{figure}
@@ -96,20 +96,20 @@ Platforma bazată pe Raspberry Pi dispune de resurse de calcul reduse și utiliz
 \begin{figure}[htbp]
     \centering
     % Prima imagine (stânga): harta de adâncime
-    \begin{minipage}{0.48\textwidth}
+    \begin{subfigure}[t]{0.48\textwidth}
         \centering
         \includegraphics[width=\linewidth]{figures/real_world_examples/nvidia/20260604_125553_2_depth.png}
         \caption{Harta de adâncime corespunzătoare.}
         \label{fig:long_road_example_sol_depth}
-    \end{minipage}
+    \end{subfigure}
     \hfill
     % A doua imagine (dreapta): planul solului detectat
-    \begin{minipage}{0.48\textwidth}
+    \begin{subfigure}[t]{0.48\textwidth}
         \centering
         \includegraphics[width=\linewidth]{figures/real_world_examples/nvidia/20260604_125553_5_view.png}
         \caption{Planul solului detectat, incomplet la distanță mare.}
         \label{fig:long_road_example_sol}
-    \end{minipage}
+    \end{subfigure}
     \caption{Detecția solului pe un traseu lung: harta de adâncime nu prezintă anomalii vizibile, însă planul detectat nu include punctele îndepărtate.}
     \label{fig:long_road_estimare}
 \end{figure}
@@ -132,7 +132,7 @@ De asemenea, în anumite situații planul de mers detectat conține porțiuni ne
     \label{fig:spatii_sol}
 \end{figure}
 
-Exemplele prezentate până în acest punct provin de la sistemul bazat pe NVidia. Comparația cu platforma Raspberry Pi indică influența pe care precizia hărții de adâncime o are asupra detecției solului: pe Raspberry Pi planul solului nu este identificat corect, așa cum se observă în figura \ref{fig:rpi_sol}.
+Exemplele prezentate până în acest punct provin de la sistemul bazat pe NVIDIA. Comparația cu platforma Raspberry Pi indică influența pe care precizia hărții de adâncime o are asupra detecției solului: pe Raspberry Pi planul solului nu este identificat corect, așa cum se observă în figura \ref{fig:rpi_sol}.
 
 \begin{figure}[htbp]
     \centering
@@ -158,9 +158,9 @@ Drumul de cost minim nu este calculat pe proiecția tridimensională a planului 
 \section{Latență}
 \label{sec:ch5sec4}
 
-Spre deosebire de secțiunile anterioare, evaluarea latenței se bazează pe date cantitative colectate de modulul de profilare integrat în aplicație. Acesta măsoară, cu ajutorul funcției \texttt{time.perf\_counter()}, durata fiecărei etape a pipeline-ului pentru fiecare cadru procesat și o înregistrează într-un fișier CSV, în loturi, pentru a nu introduce întârzieri suplimentare pe calea critică. Statisticile prezentate în continuare au fost obținute pe platforma bazată pe NVidia (rezoluție 640$\times$480, model Depth Anything 3 metric, varianta Large), agregând aproximativ 9.989 de cadre din 13 sesiuni de rulare distincte. Primul cadru al fiecărei sesiuni a fost exclus, întrucât include inițializarea modelului și nu reflectă regimul normal de funcționare.
+Spre deosebire de secțiunile anterioare, evaluarea latenței se bazează pe date cantitative colectate de modulul de profilare integrat în aplicație. Acesta măsoară, cu ajutorul funcției \texttt{time.perf\_counter()}, durata fiecărei etape a pipeline-ului pentru fiecare cadru procesat și o înregistrează într-un fișier CSV, în loturi, pentru a nu introduce întârzieri suplimentare pe calea critică. Statisticile prezentate în continuare au fost obținute pe platforma bazată pe NVIDIA (rezoluție 640$\times$480, model Depth Anything 3 metric, varianta Large), agregând aproximativ 9.989 de cadre din 13 sesiuni de rulare distincte. Primul cadru al fiecărei sesiuni a fost exclus, întrucât include inițializarea modelului și nu reflectă regimul normal de funcționare.
 
-Pipeline-ul este compus din patru etape sincrone — corecția distorsiunii, estimarea adâncimii, detecția solului și determinarea drumului — a căror sumă constituie timpul total de procesare per cadru. Capturarea cadrului de la cameră se desfășoară pe un thread separat, în paralel cu procesarea, motiv pentru care nu este inclusă în timpul total, deși este raportată informativ. Rezultatele agregate sunt prezentate în tabelul \ref{tab:latenta_nvidia}.
+Pipeline-ul este compus din patru etape sincrone, corecția distorsiunii, estimarea adâncimii, detecția solului și determinarea drumului, a căror sumă constituie timpul total de procesare per cadru. Capturarea cadrului de la cameră se desfășoară pe un thread separat, în paralel cu procesarea, motiv pentru care nu este inclusă în timpul total, deși este raportată informativ. Rezultatele agregate sunt prezentate în tabelul \ref{tab:latenta_nvidia}.
 
 \begin{table}[htbp]
     \centering
@@ -178,17 +178,17 @@ Pipeline-ul este compus din patru etape sincrone — corecția distorsiunii, est
         Total procesare & 113,2 & 79,6 & 200,9 & 276,6 \\
         \bottomrule
     \end{tabular}
-    \caption{Statistici de latență per etapă pe platforma NVidia, agregate peste 9.989 de cadre din 13 sesiuni de rulare (cadrul de inițializare exclus). $^{*}$Capturarea cadrului se execută pe un thread separat și nu este inclusă în timpul total de procesare.}
+    \caption{Statistici de latență per etapă pe platforma NVIDIA, agregate peste 9.989 de cadre din 13 sesiuni de rulare (cadrul de inițializare exclus). $^{*}$Capturarea cadrului se execută pe un thread separat și nu este inclusă în timpul total de procesare.}
     \label{tab:latenta_nvidia}
 \end{table}
 
-Estimarea adâncimii reprezintă componenta dominantă a timpului de procesare, cu aproximativ 56\% din total (64,1 ms în medie). Aceasta este singura etapă bazată pe o rețea neuronală și constituie principala limitare a cadenței, având totodată o variabilitate redusă (deviație standard de 9,1 ms). Etapele pur geometrice — corecția distorsiunii și detecția solului — au un cost redus, sub 1 ms fiecare, ceea ce este consistent cu decizia de a folosi o metodă bazată pe RANSAC pentru detecția solului, în locul unei a doua rețele neuronale.
+Estimarea adâncimii reprezintă componenta dominantă a timpului de procesare, cu aproximativ 56\% din total (64,1 ms în medie). Aceasta este singura etapă bazată pe o rețea neuronală și constituie principala limitare a cadenței, având totodată o variabilitate redusă (deviație standard de 9,1 ms). Etapele pur geometrice, corecția distorsiunii și detecția solului, au un cost redus, sub 1 ms fiecare, ceea ce este consistent cu decizia de a folosi o metodă bazată pe RANSAC pentru detecția solului, în locul unei a doua rețele neuronale.
 
 Etapa de determinare a drumului are un cost median redus (13,7 ms), însă distribuția sa prezintă valori extreme: aproximativ 19\% dintre cadre depășesc 50 ms, iar în cazuri nefavorabile căutarea drumului poate dura câteva secunde. Aceasta explică diferența dintre medie (47,7 ms) și mediană și se reflectă în cei doi indicatori ai cadenței. Pornind de la mediana timpului total (79,6 ms), sistemul atinge aproximativ 12,6 cadre pe secundă, în timp ce media (113,2 ms) corespunde unei valori de aproximativ 8,8 cadre pe secundă. Diferența dintre cele două valori este determinată de cadrele cu cost ridicat în etapa de determinare a drumului.
 
-Pe platforma NVidia, latența este determinată în principal de modelul de estimare a adâncimii, celelalte componente având un cost redus și predictibil. O optimizare a latenței ar viza, în primul rând, accelerarea inferenței modelului de adâncime și, în al doilea rând, reducerea variabilității etapei de determinare a drumului.
+Pe platforma NVIDIA, latența este determinată în principal de modelul de estimare a adâncimii, celelalte componente având un cost redus și predictibil. O optimizare a latenței ar viza, în primul rând, accelerarea inferenței modelului de adâncime și, în al doilea rând, reducerea variabilității etapei de determinare a drumului.
 
-Aceleași măsurători au fost realizate și pe sistemul bazat pe Raspberry Pi + Hailo-8, pentru a evalua influența platformei hardware asupra latenței. Spre deosebire de platforma NVidia, estimarea adâncimii este delegată acceleratorului neuronal Hailo-8 și utilizează un model de dimensiuni reduse — Depth Anything 2, varianta ViT-S, la rezoluția 224$\times$224, în mod relativ. Statisticile, agregate peste aproximativ 2.086 de cadre din 2 sesiuni de rulare, sunt prezentate în tabelul \ref{tab:latenta_rpi}.
+Aceleași măsurători au fost realizate și pe sistemul bazat pe Raspberry Pi + Hailo-8, pentru a evalua influența platformei hardware asupra latenței. Spre deosebire de platforma NVIDIA, estimarea adâncimii este delegată acceleratorului neuronal Hailo-8 și utilizează un model de dimensiuni reduse — Depth Anything 2, varianta ViT-S, la rezoluția 224$\times$224, în mod relativ. Statisticile, agregate peste aproximativ 2.086 de cadre din 2 sesiuni de rulare, sunt prezentate în tabelul \ref{tab:latenta_rpi}.
 
 \begin{table}[htbp]
     \centering
@@ -210,6 +210,6 @@ Aceleași măsurători au fost realizate și pe sistemul bazat pe Raspberry Pi +
     \label{tab:latenta_rpi}
 \end{table}
 
-Rezultatele indică un profil de latență diferit față de platforma NVidia. Pe Raspberry Pi, estimarea adâncimii are un cost redus (42,3 ms în medie, cu o deviație standard de 1,8 ms), ca urmare a modelului de dimensiuni reduse executat pe acceleratorul neuronal. În schimb, componenta dominantă devine etapa de determinare a drumului (83,4 ms în medie, aproximativ 61\% din total), executată pe procesorul ARM. Și în acest caz distribuția prezintă valori extreme, peste 43\% dintre cadre depășind 50 ms. Latențele estimării adâncimii nu sunt însă direct comparabile între cele două platforme, întrucât modelele utilizate diferă ca generație și dimensiune, așa cum s-a discutat în secțiunea \ref{sec:ch5sec1}.
+Rezultatele indică un profil de latență diferit față de platforma NVIDIA. Pe Raspberry Pi, estimarea adâncimii are un cost redus (42,3 ms în medie, cu o deviație standard de 1,8 ms), ca urmare a modelului de dimensiuni reduse executat pe acceleratorul neuronal. În schimb, componenta dominantă devine etapa de determinare a drumului (83,4 ms în medie, aproximativ 61\% din total), executată pe procesorul ARM. Și în acest caz distribuția prezintă valori extreme, peste 43\% dintre cadre depășind 50 ms. Latențele estimării adâncimii nu sunt însă direct comparabile între cele două platforme, întrucât modelele utilizate diferă ca generație și dimensiune, așa cum s-a discutat în secțiunea \ref{sec:ch5sec1}.
 
-În ansamblu, cele două platforme ating cadențe apropiate — aproximativ 11,0 cadre pe secundă (mediană) pe Raspberry Pi, față de 12,6 pe NVidia — dar limitate de componente diferite: sistemul NVidia este limitat de inferența modelului de adâncime, în timp ce sistemul Raspberry Pi, deși execută inferența pe acceleratorul neuronal, este limitat de calculele geometrice efectuate pe procesorul ARM. În consecință, pe platforma embedded, optimizarea ar viza în primul rând etapa de determinare a drumului.
+În ansamblu, cele două platforme ating cadențe apropiate, aproximativ 11,0 cadre pe secundă (mediană) pe Raspberry Pi, față de 12,6 pe NVIDIA, dar limitate de componente diferite: sistemul NVIDIA este limitat de inferența modelului de adâncime, în timp ce sistemul Raspberry Pi, deși execută inferența pe acceleratorul neuronal, este limitat de calculele geometrice efectuate pe procesorul ARM. În consecință, pe platforma embedded, optimizarea ar viza în primul rând etapa de determinare a drumului.
