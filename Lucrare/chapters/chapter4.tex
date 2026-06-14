@@ -330,6 +330,7 @@ Figura~\ref{fig:seqdiagram} ilustrează interacțiunea dintre componente pentru 
 \end{figure}
 
 \section{Gestiunea Fișierelor de Calibrare (CRUD)}
+\label{sec:crud}
 
 Aplicația include un subsistem dedicat stocării și gestionării calibrărilor produse în urma sesiunilor de calibrare. Arhitectura acestuia urmează modelul clasic pe trei niveluri: domeniu, repository și serviciu.
 
@@ -346,6 +347,42 @@ Aplicația include un subsistem dedicat stocării și gestionării calibrărilor
 \end{itemize}
 
 Validarea este delegată clasei \texttt{CalibrationValidator}, care verifică RMS-ul, integritatea fișierului \texttt{.npz} și lungimea câmpurilor text înainte de orice operație de scriere.
+
+\section{Testarea Automată a Componentelor}
+\label{sec:testing}
+
+Separarea strictă a responsabilităților nu este doar un principiu de proiectare, ci și o condiție care face codul testabil în izolare. Deoarece stratul de persistență nu depinde de interfața grafică, de cameră sau de modelul de adâncime, operațiile sale pot fi verificate automat fără a porni întreaga aplicație. Subsistemul de gestiune a calibrărilor (Secțiunea~\ref{sec:crud}), fiind componenta cu cea mai bogată logică de tip CRUD și cu efecte atât asupra bazei de date, cât și asupra sistemului de fișiere, a fost ales drept țintă principală a testării.
+
+\textbf{Framework-ul de testare.} Testele sunt scrise folosind \texttt{pytest}, standardul de facto pentru testarea automată în Python. Spre deosebire de modulul \texttt{unittest} din biblioteca standard, \texttt{pytest} permite scrierea testelor ca funcții simple cu aserțiuni native (\texttt{assert}) și oferă mecanismul de \textit{fixtures}: blocuri de pregătire reutilizabile, injectate automat în testele care le solicită ca parametri.
+
+\textbf{Izolarea prin fixtures.} Fiecare test rulează complet izolat, fără a atinge baza de date reală (\texttt{calibrations.db}) sau directorul de fișiere de producție. Fixture-ul \texttt{tmp\_path} oferit de \texttt{pytest} furnizează un director temporar unic per test, șters automat la final. Pe baza lui se construiesc: un motor SQLAlchemy legat de o bază de date SQLite temporară, cu tabelele create la cerere; un director temporar pentru fișierele \texttt{.npz}; o instanță de \texttt{CalibrationLibraryService} configurată să folosească aceste resurse efemere; și un fișier \texttt{.npz} valid de test, generat programatic cu NumPy. Astfel, testele sunt deterministe, independente între ele și repetabile.
+
+\textbf{Acoperirea operațiilor CRUD.} Suita verifică operațiile pe ambele niveluri ale subsistemului:
+\begin{itemize}
+    \item la nivelul \texttt{CalibrationRepository} --- inserarea cu generarea automată a identificatorului și a datei, interogarea după identificator și listarea completă, actualizarea care modifică exclusiv numele și notele (păstrând neschimbate câmpurile tehnice) și ștergerea, inclusiv comportamentul corect pentru identificatori inexistenți;
+    \item la nivelul \texttt{CalibrationLibraryService} --- crearea prin \texttt{import\_file()} și \texttt{add\_from\_calibration()} cu verificarea copierii fizice a fișierului în directorul gestionat, listarea, actualizarea metadatelor și ștergerea care elimină simultan înregistrarea din baza de date și fișierul \texttt{.npz} de pe disc;
+    \item validările --- respingerea unui fișier inexistent, a unui scor RMS nerezonabil de mare și a unui nume care depășește limita de lungime, confirmând că erorile sunt semnalate prin excepția dedicată \texttt{CalibrationValidationError}.
+\end{itemize}
+
+Suita rezultată conține 18 teste, organizate conform Tabelului~\ref{tab:tests}, și se execută în mai puțin de o secundă, ceea ce o face potrivită pentru rulare frecventă în timpul dezvoltării.
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{|l|c|p{6.5cm}|}
+\hline
+\textbf{Modul} & \textbf{Teste} & \textbf{Ce verifică} \\
+\hline
+\texttt{conftest.py} & --- & Fixtures comune: bază de date și director temporare, serviciul și fișierul \texttt{.npz} de test \\
+\hline
+\texttt{test\_calibration\_repository.py} & 8 & Operațiile CRUD direct pe baza de date, prin \texttt{CalibrationRepository} \\
+\hline
+\texttt{test\_calibration\_service.py} & 10 & CRUD prin \texttt{CalibrationLibraryService}, copierea/ștergerea fișierelor și validările \\
+\hline
+\end{tabular}
+\caption{Structura suitei de teste pentru subsistemul de calibrări.}
+\label{tab:tests}
+\end{table}
 
 \section{Instrumentarea pentru Profilarea Latenței}
 \label{sec:profiling}
